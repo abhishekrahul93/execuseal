@@ -3,21 +3,34 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from execuseal import ActionContext, Environment, Impact, ToolAction
 from execuseal.api import GatewaySettings, create_app
 
 API_KEY = "test-key-at-least-16-characters"
+REVIEWER_KEY = "reviewer-key-at-least-16-characters"
 
 
 @pytest.fixture
 def client(tmp_path: Path) -> TestClient:
     policy_path = Path(__file__).parents[1] / "policies" / "warehouse.yml"
     database_url = f"sqlite:///{tmp_path / 'audit.db'}"
-    app = create_app(GatewaySettings((API_KEY,), policy_path, database_url=database_url))
+    app = create_app(
+        GatewaySettings(
+            (API_KEY,),
+            policy_path,
+            database_url=database_url,
+            reviewer_api_keys=(REVIEWER_KEY,),
+        )
+    )
     return TestClient(app)
 
 
 def auth_headers(**extra: str) -> dict[str, str]:
     return {"X-API-Key": API_KEY, **extra}
+
+
+def review_headers() -> dict[str, str]:
+    return {"X-Reviewer-Key": REVIEWER_KEY}
 
 
 def test_health_is_public_and_disables_caching(client: TestClient) -> None:
@@ -95,9 +108,107 @@ def test_inventory_update_requires_approval_and_creates_audit_record(
     assert body["execution_allowed"] is False
     assert body["policy_rule_id"] == "review-production-inventory-write"
     assert body["blast_radius"]["score"] == 50
+    assert body["approval_id"]
+    assert body["approval_expires_at"]
     assert len(body["audit_hash"]) == 64
     assert client.app.state.gateway.audit_store.verify()
     assert client.app.state.gateway.audit_store.count() == 1
+
+
+def test_reviewer_can_approve_exact_pending_action_once(client: TestClient) -> None:
+    action = {
+        "context": {
+            "agent_id": "warehouse-copilot",
+            "principal_id": "operator-42",
+            "environment": "production",
+        },
+        "action": {
+            "tool": "inventory_db",
+            "operation": "update",
+            "resource": "stock_levels",
+            "impact": "multiple_records",
+            "parameters": {"count": 25},
+        },
+    }
+    requested = client.post(
+        "/v1/actions/authorize", headers=auth_headers(), json=action
+    ).json()
+    approval_id = requested["approval_id"]
+
+    missing_reviewer = client.post(
+        f"/v1/approvals/{approval_id}/decision",
+        headers=auth_headers(),
+        json={**action, "decision": "approved", "reason": "Ticket verified"},
+    )
+    assert missing_reviewer.status_code == 401
+
+    approved = client.post(
+        f"/v1/approvals/{approval_id}/decision",
+        headers=review_headers(),
+        json={**action, "decision": "approved", "reason": "Ticket verified"},
+    )
+    assert approved.status_code == 200
+    assert approved.json()["status"] == "approved"
+    token = approved.json()["authorization_token"]
+    assert token.startswith("exs1.")
+    claims = client.app.state.gateway.signer.verify_and_consume(
+        token,
+        ToolAction(
+            "inventory_db",
+            "update",
+            "stock_levels",
+            impact=Impact.MULTIPLE_RECORDS,
+            parameters={"count": 25},
+        ),
+        ActionContext("warehouse-copilot", "operator-42", Environment.PRODUCTION),
+    )
+    assert claims.action == "allow"
+
+    duplicate = client.post(
+        f"/v1/approvals/{approval_id}/decision",
+        headers=review_headers(),
+        json={**action, "decision": "rejected", "reason": "Changed mind"},
+    )
+    assert duplicate.status_code == 409
+
+
+def test_approval_rejects_changed_action_and_rejection_issues_no_token(
+    client: TestClient,
+) -> None:
+    action = {
+        "context": {
+            "agent_id": "warehouse-copilot",
+            "principal_id": "operator-42",
+            "environment": "production",
+        },
+        "action": {
+            "tool": "inventory_db",
+            "operation": "update",
+            "resource": "stock_levels",
+            "impact": "multiple_records",
+            "parameters": {"count": 25},
+        },
+    }
+    approval_id = client.post(
+        "/v1/actions/authorize", headers=auth_headers(), json=action
+    ).json()["approval_id"]
+    changed = {**action, "action": {**action["action"], "parameters": {"count": 250}}}
+    mismatch = client.post(
+        f"/v1/approvals/{approval_id}/decision",
+        headers=review_headers(),
+        json={**changed, "decision": "approved", "reason": "Approve"},
+    )
+    assert mismatch.status_code == 409
+    assert "does not match" in mismatch.json()["detail"]
+
+    rejected = client.post(
+        f"/v1/approvals/{approval_id}/decision",
+        headers=review_headers(),
+        json={**action, "decision": "rejected", "reason": "No change ticket"},
+    )
+    assert rejected.status_code == 200
+    assert rejected.json()["status"] == "rejected"
+    assert rejected.json()["authorization_token"] is None
 
 
 def test_customer_export_is_blocked(client: TestClient) -> None:
@@ -141,7 +252,11 @@ def test_openapi_contract_documents_api_key_security(client: TestClient) -> None
     contract = client.get("/openapi.json").json()
 
     assert contract["info"]["title"] == "ExecuSeal Gateway"
-    assert "APIKeyHeader" in contract["components"]["securitySchemes"]
+    assert contract["components"]["securitySchemes"]["AgentApiKey"]["name"] == "X-API-Key"
+    assert (
+        contract["components"]["securitySchemes"]["ReviewerApiKey"]["name"]
+        == "X-Reviewer-Key"
+    )
     assert contract["paths"]["/v1/actions/authorize"]["post"]["security"]
 
 
@@ -150,6 +265,12 @@ def test_settings_require_strong_unique_keys(tmp_path: Path) -> None:
         GatewaySettings(("short",), tmp_path / "policy.yml")
     with pytest.raises(ValueError, match="unique"):
         GatewaySettings((API_KEY, API_KEY), tmp_path / "policy.yml")
+    with pytest.raises(ValueError, match="separate"):
+        GatewaySettings(
+            (API_KEY,),
+            tmp_path / "policy.yml",
+            reviewer_api_keys=(API_KEY,),
+        )
 
 
 def test_production_requires_postgresql(tmp_path: Path) -> None:

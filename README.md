@@ -84,6 +84,8 @@ operational-agent example.
 - MCP `tools/call` interception with policy enforcement before execution
 - short-lived authorization tokens bound to exact action arguments and identity
 - replay rejection preventing reuse of an authorization decision
+- persistent, expiring human approvals with separate reviewer credentials
+- exact-action approval binding and atomic approve/reject transitions
 
 ## API gateway
 
@@ -92,6 +94,7 @@ tool credentials and never executes the action.
 
 ```bash
 export EXECUSEAL_API_KEYS="replace-with-a-long-random-secret"
+export EXECUSEAL_REVIEWER_API_KEYS="use-a-different-reviewer-secret"
 export EXECUSEAL_POLICY_PATH="policies/warehouse.yml"
 uvicorn execuseal.api:create_app --factory --host 127.0.0.1 --port 8000
 ```
@@ -126,6 +129,8 @@ API surface:
 | `GET /readyz` | Public | Loaded policy readiness |
 | `POST /v1/scan` | API key | Explainable prompt-risk assessment |
 | `POST /v1/actions/authorize` | API key | Pre-execution tool-action decision |
+| `GET /v1/approvals/{id}` | Reviewer key | Inspect approval metadata |
+| `POST /v1/approvals/{id}/decision` | Reviewer key | Approve or reject an exact action |
 
 API keys are suitable only for this initial service boundary. Production
 identity will require scoped principals, rotation, revocation, and a managed
@@ -135,6 +140,13 @@ Allowed action responses include a short-lived `authorization_token`. The token
 is bound to the exact agent identity, principal, environment, tool metadata and
 arguments. Changing an argument invalidates it, expiration is enforced, and a
 token cannot be consumed twice within one gateway process.
+
+When policy returns `review`, the response includes an expiring `approval_id`
+instead of an authorization token. A reviewer must submit the original action
+metadata to the decision endpoint with a separate `X-Reviewer-Key`. ExecuSeal
+binds the approval to the canonical action digest, records only metadata (not
+parameters), atomically permits one decision, and issues a token only after an
+approval. Agent API keys and reviewer keys must never overlap.
 
 ## MCP interception
 

@@ -65,6 +65,7 @@ jobs:
       - name: Validate Compose
         env:
           EXECUSEAL_API_KEYS: ci-validation-key-not-for-production
+          EXECUSEAL_REVIEWER_API_KEYS: ci-reviewer-key-not-for-production
           POSTGRES_PASSWORD: ci-validation-password
         run: docker compose config --quiet
       - name: Build hardened image

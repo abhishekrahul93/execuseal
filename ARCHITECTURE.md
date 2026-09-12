@@ -109,3 +109,13 @@ The MCP adapter handles JSON-RPC `tools/call` requests. Security attributes come
 from locally trusted tool profiles, never tool descriptions, annotations or
 model-supplied arguments. Denied and review-required calls return tool execution
 errors and never invoke the downstream handler.
+
+## Decision ADR-011: approvals require separation of duties
+
+Review decisions use credentials distinct from agent gateway credentials. A
+pending request stores only identity and resource metadata plus a canonical
+digest of the complete action. The reviewer must resubmit the exact action;
+changed arguments fail digest verification. SQL performs a conditional state
+transition from `pending` to `approved` or `rejected`, making the decision
+single-use under concurrent requests. Requests expire, and only an approved
+request receives a short-lived execution token.

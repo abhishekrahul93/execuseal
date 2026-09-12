@@ -4,6 +4,7 @@ services:
     restart: unless-stopped
     environment:
       EXECUSEAL_API_KEYS: ${EXECUSEAL_API_KEYS:?Set EXECUSEAL_API_KEYS to a strong random value}
+      EXECUSEAL_REVIEWER_API_KEYS: ${EXECUSEAL_REVIEWER_API_KEYS:?Set a separate reviewer key}
       EXECUSEAL_POLICY_PATH: /app/policies/warehouse.yml
       EXECUSEAL_DATABASE_URL: postgresql+psycopg://execuseal:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/execuseal
       EXECUSEAL_ENVIRONMENT: production
@@ -11,6 +12,7 @@ services:
       EXECUSEAL_RATE_LIMIT_WINDOW_SECONDS: ${EXECUSEAL_RATE_LIMIT_WINDOW_SECONDS:-60}
       EXECUSEAL_SIGNING_SECRET: ${EXECUSEAL_SIGNING_SECRET:?Set EXECUSEAL_SIGNING_SECRET to a strong random value}
       EXECUSEAL_TOKEN_TTL_SECONDS: ${EXECUSEAL_TOKEN_TTL_SECONDS:-30}
+      EXECUSEAL_APPROVAL_TTL_SECONDS: ${EXECUSEAL_APPROVAL_TTL_SECONDS:-900}
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:

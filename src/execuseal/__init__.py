@@ -7,6 +7,12 @@ from execuseal.actions import (
     Impact,
     ToolAction,
 )
+from execuseal.approvals import (
+    ApprovalError,
+    ApprovalRequest,
+    ApprovalStatus,
+    SqlApprovalStore,
+)
 from execuseal.audit import AuditChain, AuditRecord
 from execuseal.benchmark import BenchmarkResult, BenchmarkRunner
 from execuseal.blast_radius import BlastRadius, BlastRadiusAssessor
@@ -22,6 +28,9 @@ __all__ = [
     "ActionContext",
     "ActionDecision",
     "ActionFirewall",
+    "ApprovalError",
+    "ApprovalRequest",
+    "ApprovalStatus",
     "AuditChain",
     "AuditRecord",
     "AuthorizationClaims",
@@ -41,6 +50,7 @@ __all__ = [
     "PolicySet",
     "SafetyDecision",
     "SafetyEngine",
+    "SqlApprovalStore",
     "ToolAction",
     "TokenError",
     "load_policy",

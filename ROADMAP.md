@@ -19,13 +19,13 @@
 - [x] MCP `tools/call` interception baseline
 - [x] Action-bound signed decisions with expiry and replay protection
 - [x] Unsafe warehouse-agent execution proof
+- [x] Persistent approval workflow with expiry and separation of duties
 
 ## v0.2 — agent action security
 
 - resource patterns, principal scopes, quotas, and time constraints
 - secrets and PII detectors with redaction
 - signed audit checkpoints and durable storage adapter
-- approval workflow with expiry and separation of duties
 - scoped service identities and API-key rotation/revocation
 - schema migrations and signed external integrity checkpoints
 - distributed rate limiting

@@ -52,3 +52,8 @@ the host application. Hash chaining detects record modification but cannot by
 itself detect removal or replacement of the entire audit chain. Sandboxing,
 strong identity, least-privilege credentials, durable logs, and human approval
 remain necessary controls.
+
+Approval records bind a human decision to the exact action digest, expire, and
+permit one atomic transition. This does not prove the reviewer is trustworthy;
+deployments must protect reviewer credentials, authenticate real identities,
+and prevent agents from reaching the reviewer interface or secret store.

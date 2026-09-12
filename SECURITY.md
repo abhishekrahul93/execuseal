@@ -13,7 +13,9 @@ launched and publish a supported-version policy before the first stable release.
 
 The current API-key mechanism is an initial authenticated boundary. Use HTTPS,
 store keys outside source control, restrict network exposure, and rotate any key
-that may have leaked. PostgreSQL persistence is available, but external signed
+that may have leaked. Reviewer keys must be held by humans or approval services,
+kept separate from agent keys, and rotated independently. PostgreSQL persistence is
+available, but external signed
 checkpoints are still required to detect deletion or replacement of the entire
 database.
 

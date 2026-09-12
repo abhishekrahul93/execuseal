@@ -75,14 +75,14 @@ class AuthorizationSigner:
             version=1,
             token_id=secrets.token_urlsafe(18),
             action=decision.value,
-            action_digest=_action_digest(action, context),
+            action_digest=action_digest(action, context),
             issued_at=issued_at,
             expires_at=issued_at + self._ttl_seconds,
         )
         serialized = json.dumps(asdict(claims), sort_keys=True, separators=(",", ":"))
         payload = _encode(serialized.encode())
         signature = _encode(hmac.digest(self._secret, payload.encode(), "sha256"))
-        return f"asl1.{payload}.{signature}"
+        return f"exs1.{payload}.{signature}"
 
     def verify_and_consume(
         self,
@@ -96,7 +96,7 @@ class AuthorizationSigner:
             prefix, payload, supplied_signature = token.split(".")
         except ValueError as error:
             raise TokenError("malformed authorization token") from error
-        if prefix != "asl1":
+        if prefix != "exs1":
             raise TokenError("unsupported authorization token version")
         expected_signature = _encode(hmac.digest(self._secret, payload.encode(), "sha256"))
         if not hmac.compare_digest(supplied_signature, expected_signature):
@@ -110,13 +110,14 @@ class AuthorizationSigner:
             raise TokenError("token does not authorize execution")
         if current < claims.issued_at - 5 or current >= claims.expires_at:
             raise TokenError("authorization token has expired or is not yet valid")
-        if not hmac.compare_digest(claims.action_digest, _action_digest(action, context)):
+        if not hmac.compare_digest(claims.action_digest, action_digest(action, context)):
             raise TokenError("authorization token does not match this action")
         self._replay_guard.consume(claims.token_id, claims.expires_at, current)
         return claims
 
 
-def _action_digest(action: ToolAction, context: ActionContext) -> str:
+def action_digest(action: ToolAction, context: ActionContext) -> str:
+    """Return the canonical identity digest used by approvals and tokens."""
     document = {
         "context": {
             "agent_id": context.agent_id,

@@ -134,3 +134,11 @@ Ordered migrations are recorded in `schema_migrations`. Development can apply
 missing migrations automatically; production startup only verifies the expected
 version and refuses service when the schema is absent or stale. Deployment runs
 `execuseal db upgrade` before starting the gateway.
+
+## Decision ADR-014: externally anchored audit integrity
+
+An audit checkpoint signs the chain head, record count, timestamp, and key ID
+with a dedicated Ed25519 key. Verification proves the current database still
+contains the exact historical prefix represented by that checkpoint. Checkpoint
+JSON must be copied to storage outside the database trust boundary; keeping it
+only beside the database provides no rollback protection.

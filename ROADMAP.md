@@ -22,13 +22,13 @@
 - [x] Persistent approval workflow with expiry and separation of duties
 - [x] Ed25519 signing, key rotation, and durable replay prevention
 - [x] Schema migrations and scoped service-identity lifecycle
+- [x] Signed external audit checkpoints and offline verification
 
 ## v0.2 — agent action security
 
 - resource patterns, principal scopes, quotas, and time constraints
 - secrets and PII detectors with redaction
 - signed audit checkpoints and durable storage adapter
-- signed external integrity checkpoints
 - distributed rate limiting
 - indirect prompt-injection benchmark
 

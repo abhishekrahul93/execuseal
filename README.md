@@ -90,6 +90,7 @@ operational-agent example.
 - durable SQL replay prevention across workers and restarts
 - SQL-backed scoped service identities with expiry and revocation
 - versioned database migrations and one-time key issuance
+- portable Ed25519-signed audit checkpoints with offline verification
 
 ## API gateway
 
@@ -153,6 +154,27 @@ Production startup requires the current schema. Apply migrations first:
 ```bash
 execuseal db upgrade --database-url "$EXECUSEAL_DATABASE_URL"
 ```
+
+Create a checkpoint periodically and copy the resulting JSON to independent,
+append-only storage. The private-key file contains one base64-encoded raw
+Ed25519 key; the public-key file is a JSON key-ID map:
+
+```bash
+execuseal audit checkpoint create \
+  --database-url "$EXECUSEAL_DATABASE_URL" \
+  --key-id audit-2026-09 \
+  --private-key-file ./audit-private.key \
+  --output ./checkpoint.json
+
+execuseal audit checkpoint verify \
+  --database-url "$EXECUSEAL_DATABASE_URL" \
+  --public-keys-file ./audit-public-keys.json \
+  --checkpoint ./checkpoint.json
+```
+
+Verification checks the signature, current hash chain, historical chain head,
+and record count. This detects modification and rollback relative to the latest
+checkpoint you retained externally.
 
 Allowed action responses include a short-lived Ed25519-signed `authorization_token`. The token
 is bound to the exact agent identity, principal, environment, tool metadata and

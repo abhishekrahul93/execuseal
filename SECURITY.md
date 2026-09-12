@@ -24,6 +24,10 @@ expiry, and revocation on every request. Keep bootstrap admin keys offline where
 possible, issue narrow short-lived identities, and rotate by issuing a new key
 before revoking the old one. Generated raw keys cannot be recovered.
 
+Use a dedicated checkpoint signing key, store it outside the gateway, and copy
+checkpoint JSON to independent append-only or object-lock storage. A checkpoint
+left in the same database or writable host cannot detect whole-system rollback.
+
 Authorization signing keys are Ed25519 private keys. Never expose the private
 key-ring environment variable to agents or tool executors. Executors should
 consume only the published public keys over an authenticated TLS channel.

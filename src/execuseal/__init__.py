@@ -16,6 +16,12 @@ from execuseal.approvals import (
 from execuseal.audit import AuditChain, AuditRecord
 from execuseal.benchmark import BenchmarkResult, BenchmarkRunner
 from execuseal.blast_radius import BlastRadius, BlastRadiusAssessor
+from execuseal.checkpoints import (
+    AuditCheckpoint,
+    CheckpointError,
+    create_checkpoint,
+    verify_checkpoint,
+)
 from execuseal.config import PolicyConfigError, load_policy, parse_policy
 from execuseal.engine import SafetyEngine
 from execuseal.firewall import ActionDecision, ActionFirewall
@@ -40,6 +46,7 @@ __all__ = [
     "ApprovalRequest",
     "ApprovalStatus",
     "AuditChain",
+    "AuditCheckpoint",
     "AuditRecord",
     "AuthorizationClaims",
     "AuthorizationSigner",
@@ -48,6 +55,7 @@ __all__ = [
     "BenchmarkRunner",
     "BlastRadius",
     "BlastRadiusAssessor",
+    "CheckpointError",
     "DataClassification",
     "Environment",
     "Finding",
@@ -69,6 +77,8 @@ __all__ = [
     "TokenError",
     "load_policy",
     "parse_policy",
+    "create_checkpoint",
     "require_current",
     "upgrade",
+    "verify_checkpoint",
 ]

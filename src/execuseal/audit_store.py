@@ -66,6 +66,24 @@ class SqlAuditStore:
         with self.engine.connect() as connection:
             return len(self._records(connection))
 
+    def checkpoint_target(self) -> tuple[int, str]:
+        """Return the verified record count and current chain head."""
+        with self.engine.connect() as connection:
+            records = self._records(connection)
+        chain = AuditChain(records)
+        if not chain.verify():
+            raise ValueError("audit chain verification failed")
+        return len(records), records[-1].record_hash if records else "0" * 64
+
+    def record_hash_at(self, sequence: int) -> str | None:
+        if sequence == 0:
+            return "0" * 64
+        with self.engine.connect() as connection:
+            value = connection.execute(
+                select(audit_events.c.record_hash).where(audit_events.c.sequence == sequence)
+            ).scalar_one_or_none()
+        return value
+
     def close(self) -> None:
         self.engine.dispose()
 

@@ -42,6 +42,17 @@ def test_health_is_public_and_disables_caching(client: TestClient) -> None:
     assert response.headers["x-content-type-options"] == "nosniff"
 
 
+def test_public_verification_key_ring_contains_no_private_key(client: TestClient) -> None:
+    response = client.get("/.well-known/execuseal-keys.json")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["algorithm"] == "Ed25519"
+    assert body["active_key_id"] == "development"
+    assert set(body["keys"]) == {"development"}
+    assert len(body["keys"]["development"]) == 44
+
+
 @pytest.mark.parametrize("headers", [{}, {"X-API-Key": "wrong-key-wrong-key"}])
 def test_protected_routes_require_valid_api_key(
     client: TestClient,
@@ -150,7 +161,7 @@ def test_reviewer_can_approve_exact_pending_action_once(client: TestClient) -> N
     assert approved.status_code == 200
     assert approved.json()["status"] == "approved"
     token = approved.json()["authorization_token"]
-    assert token.startswith("exs1.")
+    assert token.startswith("exs2.development.")
     claims = client.app.state.gateway.signer.verify_and_consume(
         token,
         ToolAction(
@@ -270,6 +281,14 @@ def test_settings_require_strong_unique_keys(tmp_path: Path) -> None:
             (API_KEY,),
             tmp_path / "policy.yml",
             reviewer_api_keys=(API_KEY,),
+        )
+    with pytest.raises(ValueError, match="JSON object"):
+        GatewaySettings((API_KEY,), tmp_path / "policy.yml", signing_keys_json="not-json")
+    with pytest.raises(ValueError, match="not present"):
+        GatewaySettings(
+            (API_KEY,),
+            tmp_path / "policy.yml",
+            active_signing_key_id="missing",
         )
 
 

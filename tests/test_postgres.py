@@ -1,6 +1,8 @@
 import os
+from uuid import uuid4
 
 import pytest
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from execuseal import (
     Action,
@@ -13,6 +15,7 @@ from execuseal import (
     ToolAction,
 )
 from execuseal.audit_store import SqlAuditStore
+from execuseal.tokens import AuthorizationSigner, SqlReplayGuard, TokenError
 
 POSTGRES_URL = os.getenv("EXECUSEAL_TEST_POSTGRES_URL")
 
@@ -31,3 +34,25 @@ def test_postgresql_audit_round_trip() -> None:
     assert store.count() == 1
     assert store.verify()
     store.close()
+
+
+@pytest.mark.skipif(not POSTGRES_URL, reason="PostgreSQL integration URL not configured")
+def test_postgresql_replay_is_rejected_across_verifier_instances() -> None:
+    assert POSTGRES_URL is not None
+    action = ToolAction("db", "read", f"inventory-{uuid4()}")
+    context = ActionContext("agent", "operator", Environment.STAGING)
+    private_key = Ed25519PrivateKey.generate()
+    first_guard = SqlReplayGuard(POSTGRES_URL)
+    first_guard.initialize()
+    first = AuthorizationSigner({"integration": private_key}, "integration", first_guard)
+    token = first.issue(action, context, Action.ALLOW, now=100)
+    first.verify_and_consume(token, action, context, now=101)
+
+    second_guard = SqlReplayGuard(POSTGRES_URL)
+    second_guard.initialize()
+    second = AuthorizationSigner({"integration": private_key}, "integration", second_guard)
+    with pytest.raises(TokenError, match="consumed"):
+        second.verify_and_consume(token, action, context, now=102)
+
+    first_guard.close()
+    second_guard.close()

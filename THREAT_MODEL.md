@@ -57,3 +57,9 @@ Approval records bind a human decision to the exact action digest, expire, and
 permit one atomic transition. This does not prove the reviewer is trustworthy;
 deployments must protect reviewer credentials, authenticate real identities,
 and prevent agents from reaching the reviewer interface or secret store.
+
+Ed25519 signatures prevent a verifier from minting new execution tokens and key
+IDs permit rotation. They do not protect a stolen signing key or a verifier that
+fails to consume tokens through the shared SQL replay store. Key distribution
+must be authenticated, private keys must use managed secret storage, and a
+compromised key must be removed after its outstanding tokens expire.

@@ -3,6 +3,8 @@
 from collections.abc import Mapping
 from typing import Any
 
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
 from execuseal import (
     Action,
     ActionContext,
@@ -16,7 +18,7 @@ from execuseal import (
     PolicySet,
 )
 from execuseal.mcp import McpSafetyProxy, McpToolProfile
-from execuseal.tokens import AuthorizationSigner
+from execuseal.tokens import AuthorizationSigner, SqlReplayGuard
 
 executed_calls: list[Mapping[str, Any]] = []
 
@@ -44,9 +46,15 @@ policy = PolicySet(
         ),
     )
 )
+replay_guard = SqlReplayGuard("sqlite://")
+replay_guard.initialize()
 proxy = McpSafetyProxy(
     ActionFirewall(PolicyEngine(policy)),
-    AuthorizationSigner("demo-only-signing-secret-with-32-bytes"),
+    AuthorizationSigner(
+        {"demo-key": Ed25519PrivateKey.from_private_bytes(b"d" * 32)},
+        "demo-key",
+        replay_guard,
+    ),
     (profile,),
     {profile.name: dangerous_export},
     AuditChain(),

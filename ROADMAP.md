@@ -20,6 +20,7 @@
 - [x] Action-bound signed decisions with expiry and replay protection
 - [x] Unsafe warehouse-agent execution proof
 - [x] Persistent approval workflow with expiry and separation of duties
+- [x] Ed25519 signing, key rotation, and durable replay prevention
 
 ## v0.2 — agent action security
 

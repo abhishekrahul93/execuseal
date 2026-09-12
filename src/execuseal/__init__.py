@@ -21,7 +21,13 @@ from execuseal.engine import SafetyEngine
 from execuseal.firewall import ActionDecision, ActionFirewall
 from execuseal.models import Action, Finding, SafetyDecision
 from execuseal.policy import PolicyEngine, PolicyResult, PolicyRule, PolicySet
-from execuseal.tokens import AuthorizationClaims, AuthorizationSigner, TokenError
+from execuseal.tokens import (
+    AuthorizationClaims,
+    AuthorizationSigner,
+    AuthorizationVerifier,
+    SqlReplayGuard,
+    TokenError,
+)
 
 __all__ = [
     "Action",
@@ -35,6 +41,7 @@ __all__ = [
     "AuditRecord",
     "AuthorizationClaims",
     "AuthorizationSigner",
+    "AuthorizationVerifier",
     "BenchmarkResult",
     "BenchmarkRunner",
     "BlastRadius",
@@ -51,6 +58,7 @@ __all__ = [
     "SafetyDecision",
     "SafetyEngine",
     "SqlApprovalStore",
+    "SqlReplayGuard",
     "ToolAction",
     "TokenError",
     "load_policy",

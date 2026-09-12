@@ -1,6 +1,8 @@
 from collections.abc import Mapping
 from typing import Any
 
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
 from execuseal import (
     Action,
     ActionContext,
@@ -14,12 +16,12 @@ from execuseal import (
     PolicySet,
 )
 from execuseal.mcp import McpSafetyProxy, McpToolProfile
-from execuseal.tokens import AuthorizationSigner
-
-SECRET = "test-signing-secret-with-more-than-32-bytes"
+from execuseal.tokens import AuthorizationSigner, SqlReplayGuard
 
 
 def build_proxy(executions: list[str]) -> McpSafetyProxy:
+    replay = SqlReplayGuard("sqlite://")
+    replay.initialize()
     profiles = (
         McpToolProfile(
             "inventory.read_stock",
@@ -72,7 +74,11 @@ def build_proxy(executions: list[str]) -> McpSafetyProxy:
     handlers = {profile.name: handler for profile in profiles}
     return McpSafetyProxy(
         ActionFirewall(PolicyEngine(policy)),
-        AuthorizationSigner(SECRET),
+        AuthorizationSigner(
+            {"test-key": Ed25519PrivateKey.from_private_bytes(b"m" * 32)},
+            "test-key",
+            replay,
+        ),
         profiles,
         handlers,
         AuditChain(),

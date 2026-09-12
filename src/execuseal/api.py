@@ -37,7 +37,7 @@ from execuseal.firewall import ActionFirewall
 from execuseal.models import Action
 from execuseal.policy import PolicyEngine
 from execuseal.rate_limit import RateLimiter
-from execuseal.tokens import AuthorizationSigner, action_digest
+from execuseal.tokens import AuthorizationSigner, SqlReplayGuard, action_digest
 
 API_VERSION = "v1"
 PACKAGE_VERSION = "0.1.0a0"
@@ -56,7 +56,10 @@ class GatewaySettings:
     rate_limit_requests: int = 120
     rate_limit_window_seconds: int = 60
     deployment_environment: str = "development"
-    signing_secret: str = "development-signing-secret-change-me-32-bytes"
+    signing_keys_json: str = (
+        '{"development":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="}'
+    )
+    active_signing_key_id: str = "development"
     token_ttl_seconds: int = 30
     reviewer_api_keys: tuple[str, ...] = ()
     approval_ttl_seconds: int = 900
@@ -70,12 +73,13 @@ class GatewaySettings:
             ("postgresql://", "postgresql+psycopg://")
         ):
             raise ValueError("Production requires a PostgreSQL database URL")
-        if len(self.signing_secret.encode()) < 32:
-            raise ValueError("Signing secret must contain at least 32 bytes")
-        if self.deployment_environment == "production" and self.signing_secret.startswith(
-            "development-"
+        signing_keys = self.signing_keys()
+        if self.active_signing_key_id not in signing_keys:
+            raise ValueError("Active signing key is not present in the key ring")
+        if self.deployment_environment == "production" and self.active_signing_key_id == (
+            "development"
         ):
-            raise ValueError("Production requires a non-development signing secret")
+            raise ValueError("Production requires a non-development signing key")
         if any(len(key) < 16 for key in self.reviewer_api_keys):
             raise ValueError("Reviewer API keys must contain 16 or more characters")
         if len(set(self.reviewer_api_keys)) != len(self.reviewer_api_keys):
@@ -108,7 +112,8 @@ class GatewaySettings:
             int(os.getenv("EXECUSEAL_RATE_LIMIT_REQUESTS", "120")),
             int(os.getenv("EXECUSEAL_RATE_LIMIT_WINDOW_SECONDS", "60")),
             os.getenv("EXECUSEAL_ENVIRONMENT", "development"),
-            os.getenv("EXECUSEAL_SIGNING_SECRET", ""),
+            os.getenv("EXECUSEAL_SIGNING_KEYS_JSON", "{}"),
+            os.getenv("EXECUSEAL_ACTIVE_SIGNING_KEY_ID", ""),
             int(os.getenv("EXECUSEAL_TOKEN_TTL_SECONDS", "30")),
             tuple(
                 key.strip()
@@ -117,6 +122,21 @@ class GatewaySettings:
             ),
             int(os.getenv("EXECUSEAL_APPROVAL_TTL_SECONDS", "900")),
         )
+
+    def signing_keys(self) -> dict[str, str]:
+        try:
+            raw = json.loads(self.signing_keys_json)
+        except json.JSONDecodeError as error:
+            raise ValueError("Signing key ring must be a JSON object") from error
+        if not isinstance(raw, dict) or not raw:
+            raise ValueError("Signing key ring must be a non-empty JSON object")
+        invalid_entry = any(
+            not isinstance(key, str) or not isinstance(value, str)
+            for key, value in raw.items()
+        )
+        if invalid_entry:
+            raise ValueError("Signing key IDs and values must be strings")
+        return raw
 
 
 class StrictModel(BaseModel):
@@ -214,6 +234,12 @@ class StatusResponse(StrictModel):
     api_version: str
 
 
+class VerificationKeysResponse(StrictModel):
+    algorithm: str
+    active_key_id: str
+    keys: dict[str, str]
+
+
 @dataclass(slots=True)
 class GatewayState:
     prompt_engine: SafetyEngine
@@ -248,6 +274,8 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
         active_settings.approval_ttl_seconds,
     )
     approval_store.initialize()
+    replay_guard = SqlReplayGuard(active_settings.database_url)
+    replay_guard.initialize()
     gateway = GatewayState(
         prompt_engine=SafetyEngine(),
         action_firewall=ActionFirewall(PolicyEngine(policy)),
@@ -257,8 +285,10 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
             active_settings.rate_limit_requests,
             active_settings.rate_limit_window_seconds,
         ),
-        signer=AuthorizationSigner(
-            active_settings.signing_secret,
+        signer=AuthorizationSigner.from_base64_keys(
+            active_settings.signing_keys(),
+            active_settings.active_signing_key_id,
+            replay_guard,
             active_settings.token_ttl_seconds,
         ),
     )
@@ -359,6 +389,18 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
         if not gateway.audit_store.verify():
             raise HTTPException(status_code=503, detail="Audit chain verification failed")
         return StatusResponse(status="ready", version=PACKAGE_VERSION, api_version=API_VERSION)
+
+    @app.get(
+        "/.well-known/execuseal-keys.json",
+        response_model=VerificationKeysResponse,
+        tags=["operations"],
+    )
+    def verification_keys() -> VerificationKeysResponse:
+        return VerificationKeysResponse(
+            algorithm="Ed25519",
+            active_key_id=active_settings.active_signing_key_id,
+            keys=gateway.signer.public_keys_base64(),
+        )
 
     @app.post(
         "/v1/scan",

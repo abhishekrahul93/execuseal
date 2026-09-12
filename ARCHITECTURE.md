@@ -91,17 +91,17 @@ Authenticated requests use a thread-safe, per-key fixed-window limiter. Keys
 are represented internally by SHA-256 fingerprints and never logged. A shared
 rate-limit backend remains required for distributed deployment.
 
-## Decision ADR-009: bind authorization to the exact action
+## Decision ADR-009: asymmetric, action-bound authorization
 
-An allowed action may receive a compact HMAC-SHA256 token containing a digest
+An allowed action may receive a compact Ed25519 token containing a digest
 of verified identity, environment, tool, resource, classification, impact and
 arguments. Tokens expire within a bounded interval and are single-use. This
 prevents changing arguments between authorization and execution and blocks
-simple replay within one process.
-
-HMAC is appropriate for the initial co-located gateway/enforcer design. A
-distributed architecture should use asymmetric signatures, key identifiers,
-rotation, an external replay store and explicit audience/issuer claims.
+replay across processes through an atomic SQL token-ID insert. Tokens carry an
+issuer, audience, version, and key ID. The gateway signs with the active private
+key; separate executors verify with public keys only. Rotation retains old
+public keys through the maximum token lifetime without distributing old private
+keys.
 
 ## Decision ADR-010: MCP metadata is untrusted
 

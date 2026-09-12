@@ -86,6 +86,8 @@ operational-agent example.
 - replay rejection preventing reuse of an authorization decision
 - persistent, expiring human approvals with separate reviewer credentials
 - exact-action approval binding and atomic approve/reject transitions
+- Ed25519 authorization signatures with key IDs and rotation support
+- durable SQL replay prevention across workers and restarts
 
 ## API gateway
 
@@ -96,6 +98,9 @@ tool credentials and never executes the action.
 export EXECUSEAL_API_KEYS="replace-with-a-long-random-secret"
 export EXECUSEAL_REVIEWER_API_KEYS="use-a-different-reviewer-secret"
 export EXECUSEAL_POLICY_PATH="policies/warehouse.yml"
+# Generate a private key with: openssl rand -base64 32
+export EXECUSEAL_SIGNING_KEYS_JSON='{"key-2026-09":"<base64-private-key>"}'
+export EXECUSEAL_ACTIVE_SIGNING_KEY_ID="key-2026-09"
 uvicorn execuseal.api:create_app --factory --host 127.0.0.1 --port 8000
 ```
 
@@ -127,6 +132,7 @@ API surface:
 |---|---|---|
 | `GET /healthz` | Public | Liveness |
 | `GET /readyz` | Public | Loaded policy readiness |
+| `GET /.well-known/execuseal-keys.json` | Public | Ed25519 verification key ring |
 | `POST /v1/scan` | API key | Explainable prompt-risk assessment |
 | `POST /v1/actions/authorize` | API key | Pre-execution tool-action decision |
 | `GET /v1/approvals/{id}` | Reviewer key | Inspect approval metadata |
@@ -136,10 +142,13 @@ API keys are suitable only for this initial service boundary. Production
 identity will require scoped principals, rotation, revocation, and a managed
 secret store.
 
-Allowed action responses include a short-lived `authorization_token`. The token
+Allowed action responses include a short-lived Ed25519-signed `authorization_token`. The token
 is bound to the exact agent identity, principal, environment, tool metadata and
 arguments. Changing an argument invalidates it, expiration is enforced, and a
-token cannot be consumed twice within one gateway process.
+token cannot be consumed twice across gateway processes sharing the SQL database.
+Tokens include an issuer, audience, and key ID. Rotate keys by adding the new
+private key to the ring, changing the active ID, and retaining the old public
+key until every token it signed has expired.
 
 When policy returns `review`, the response includes an expiring `approval_id`
 instead of an authorization token. A reviewer must submit the original action

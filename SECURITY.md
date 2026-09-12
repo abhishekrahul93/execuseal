@@ -19,6 +19,13 @@ available, but external signed
 checkpoints are still required to detect deletion or replacement of the entire
 database.
 
+Authorization signing keys are Ed25519 private keys. Never expose the private
+key-ring environment variable to agents or tool executors. Executors should
+consume only the published public keys over an authenticated TLS channel.
+During rotation, keep old public keys available until their final token has
+expired. Replay protection depends on every verifier sharing the same durable
+database.
+
 The included container runs as a non-root user with a read-only filesystem and
 dropped capabilities. The Compose port binds to localhost; do not expose it
 publicly without TLS, network policy, monitoring, secret management, backups,

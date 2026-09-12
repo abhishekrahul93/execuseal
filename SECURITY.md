@@ -19,6 +19,11 @@ available, but external signed
 checkpoints are still required to detect deletion or replacement of the entire
 database.
 
+Service API keys are stored only as SHA-256 digests and checked for scope,
+expiry, and revocation on every request. Keep bootstrap admin keys offline where
+possible, issue narrow short-lived identities, and rotate by issuing a new key
+before revoking the old one. Generated raw keys cannot be recovered.
+
 Authorization signing keys are Ed25519 private keys. Never expose the private
 key-ring environment variable to agents or tool executors. Executors should
 consume only the published public keys over an authenticated TLS channel.

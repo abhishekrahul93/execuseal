@@ -7,6 +7,7 @@ import logging
 import os
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -34,6 +35,8 @@ from execuseal.audit_store import SqlAuditStore
 from execuseal.config import load_policy
 from execuseal.engine import SafetyEngine
 from execuseal.firewall import ActionFirewall
+from execuseal.identities import ServiceIdentity, SqlIdentityStore
+from execuseal.migrations import require_current, upgrade
 from execuseal.models import Action
 from execuseal.policy import PolicyEngine
 from execuseal.rate_limit import RateLimiter
@@ -63,6 +66,7 @@ class GatewaySettings:
     token_ttl_seconds: int = 30
     reviewer_api_keys: tuple[str, ...] = ()
     approval_ttl_seconds: int = 900
+    admin_api_keys: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.api_keys or any(len(key) < 16 for key in self.api_keys):
@@ -90,6 +94,12 @@ class GatewaySettings:
             raise ValueError("Production requires at least one reviewer API key")
         if not 30 <= self.approval_ttl_seconds <= 86_400:
             raise ValueError("Approval TTL must be between 30 and 86400 seconds")
+        if any(len(key) < 16 for key in self.admin_api_keys):
+            raise ValueError("Admin API keys must contain 16 or more characters")
+        if set(self.api_keys) & set(self.admin_api_keys):
+            raise ValueError("Agent and admin API keys must be separate")
+        if self.deployment_environment == "production" and not self.admin_api_keys:
+            raise ValueError("Production requires at least one admin API key")
 
     @classmethod
     def from_environment(cls) -> "GatewaySettings":
@@ -121,6 +131,11 @@ class GatewaySettings:
                 if key.strip()
             ),
             int(os.getenv("EXECUSEAL_APPROVAL_TTL_SECONDS", "900")),
+            tuple(
+                key.strip()
+                for key in os.getenv("EXECUSEAL_ADMIN_API_KEYS", "").split(",")
+                if key.strip()
+            ),
         )
 
     def signing_keys(self) -> dict[str, str]:
@@ -240,6 +255,20 @@ class VerificationKeysResponse(StrictModel):
     keys: dict[str, str]
 
 
+class IdentityCreateRequest(StrictModel):
+    principal_id: str = Field(min_length=1, max_length=128)
+    scopes: set[Literal["scan", "authorize", "admin"]] = Field(min_length=1)
+    ttl_seconds: int | None = Field(default=None, ge=60, le=31_536_000)
+
+
+class IdentityCreateResponse(StrictModel):
+    key_id: str
+    principal_id: str
+    scopes: list[str]
+    expires_at: str | None
+    api_key: str
+
+
 @dataclass(slots=True)
 class GatewayState:
     prompt_engine: SafetyEngine
@@ -248,6 +277,7 @@ class GatewayState:
     approval_store: SqlApprovalStore
     rate_limiter: RateLimiter
     signer: AuthorizationSigner
+    identity_store: SqlIdentityStore
 
 
 api_key_header = APIKeyHeader(
@@ -267,6 +297,10 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
 
     active_settings = settings or GatewaySettings.from_environment()
     policy = load_policy(active_settings.policy_path)
+    if active_settings.deployment_environment == "production":
+        require_current(active_settings.database_url)
+    else:
+        upgrade(active_settings.database_url)
     audit_store = SqlAuditStore(active_settings.database_url)
     audit_store.initialize()
     approval_store = SqlApprovalStore(
@@ -276,6 +310,12 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
     approval_store.initialize()
     replay_guard = SqlReplayGuard(active_settings.database_url)
     replay_guard.initialize()
+    identity_store = SqlIdentityStore(active_settings.database_url)
+    identity_store.initialize()
+    for key in active_settings.api_keys:
+        identity_store.bootstrap(key, "bootstrap-agent", frozenset({"scan", "authorize"}))
+    for key in active_settings.admin_api_keys:
+        identity_store.bootstrap(key, "bootstrap-admin", frozenset({"admin"}))
     gateway = GatewayState(
         prompt_engine=SafetyEngine(),
         action_firewall=ActionFirewall(PolicyEngine(policy)),
@@ -291,6 +331,7 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
             replay_guard,
             active_settings.token_ttl_seconds,
         ),
+        identity_store=identity_store,
     )
     app = FastAPI(
         title="ExecuSeal Gateway",
@@ -307,7 +348,7 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
             CORSMiddleware,
             allow_origins=list(active_settings.cors_origins),
             allow_credentials=False,
-            allow_methods=["GET", "POST"],
+            allow_methods=["GET", "POST", "DELETE"],
             allow_headers=["Content-Type", "X-API-Key", "X-Request-ID"],
         )
 
@@ -339,25 +380,33 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
         )
         return response
 
-    def require_api_key(key: str | None = Security(api_key_header)) -> None:
-        valid_key = key is not None and any(
-            hmac.compare_digest(key, valid) for valid in active_settings.api_keys
-        )
-        if not valid_key:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid or missing API key",
-                headers={"WWW-Authenticate": "ApiKey"},
+    def require_scope(required_scope: str) -> Callable[..., ServiceIdentity]:
+        def dependency(key: str | None = Security(api_key_header)) -> ServiceIdentity:
+            identity = (
+                gateway.identity_store.authenticate(key, required_scope)
+                if key is not None
+                else None
             )
-        assert key is not None
-        key_identity = hashlib.sha256(key.encode()).hexdigest()[:16]
-        allowed, _remaining = gateway.rate_limiter.allow(key_identity)
-        if not allowed:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Rate limit exceeded",
-                headers={"Retry-After": str(active_settings.rate_limit_window_seconds)},
-            )
+            if identity is None:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid, expired, revoked, or insufficiently scoped API key",
+                    headers={"WWW-Authenticate": "ApiKey"},
+                )
+            allowed, _remaining = gateway.rate_limiter.allow(identity.key_id)
+            if not allowed:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="Rate limit exceeded",
+                    headers={"Retry-After": str(active_settings.rate_limit_window_seconds)},
+                )
+            return identity
+
+        return dependency
+
+    require_scan_key = require_scope("scan")
+    require_authorize_key = require_scope("authorize")
+    require_admin_key = require_scope("admin")
 
     def require_reviewer_key(key: str | None = Security(reviewer_key_header)) -> str:
         valid_key = key is not None and any(
@@ -405,7 +454,7 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
     @app.post(
         "/v1/scan",
         response_model=ScanResponse,
-        dependencies=[Depends(require_api_key)],
+        dependencies=[Depends(require_scan_key)],
         tags=["safety"],
     )
     def scan(payload: ScanRequest, request: Request) -> ScanResponse:
@@ -428,7 +477,7 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
     @app.post(
         "/v1/actions/authorize",
         response_model=AuthorizeResponse,
-        dependencies=[Depends(require_api_key)],
+        dependencies=[Depends(require_authorize_key)],
         tags=["actions"],
     )
     def authorize(payload: AuthorizeRequest, request: Request) -> AuthorizeResponse:
@@ -518,6 +567,38 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
             else None
         )
         return _approval_response(approval, token)
+
+    @app.post(
+        "/v1/admin/identities",
+        response_model=IdentityCreateResponse,
+        dependencies=[Depends(require_admin_key)],
+        tags=["identity"],
+        status_code=201,
+    )
+    def create_identity(payload: IdentityCreateRequest) -> IdentityCreateResponse:
+        issued = gateway.identity_store.issue(
+            payload.principal_id,
+            frozenset(payload.scopes),
+            payload.ttl_seconds,
+        )
+        return IdentityCreateResponse(
+            key_id=issued.identity.key_id,
+            principal_id=issued.identity.principal_id,
+            scopes=sorted(issued.identity.scopes),
+            expires_at=issued.identity.expires_at,
+            api_key=issued.api_key,
+        )
+
+    @app.delete(
+        "/v1/admin/identities/{key_id}",
+        dependencies=[Depends(require_admin_key)],
+        tags=["identity"],
+        status_code=204,
+    )
+    def revoke_identity(key_id: str) -> Response:
+        if not gateway.identity_store.revoke(key_id):
+            raise HTTPException(status_code=404, detail="Active identity not found")
+        return Response(status_code=204)
 
     return app
 

@@ -8,6 +8,7 @@ from execuseal.api import GatewaySettings, create_app
 
 API_KEY = "test-key-at-least-16-characters"
 REVIEWER_KEY = "reviewer-key-at-least-16-characters"
+ADMIN_KEY = "admin-key-at-least-16-characters"
 
 
 @pytest.fixture
@@ -20,6 +21,7 @@ def client(tmp_path: Path) -> TestClient:
             policy_path,
             database_url=database_url,
             reviewer_api_keys=(REVIEWER_KEY,),
+            admin_api_keys=(ADMIN_KEY,),
         )
     )
     return TestClient(app)
@@ -61,7 +63,7 @@ def test_protected_routes_require_valid_api_key(
     response = client.post("/v1/scan", headers=headers, json={"text": "Hello"})
 
     assert response.status_code == 401
-    assert response.json() == {"detail": "Invalid or missing API key"}
+    assert "Invalid" in response.json()["detail"]
 
 
 def test_scan_returns_explainable_block_and_preserves_request_id(client: TestClient) -> None:
@@ -220,6 +222,45 @@ def test_approval_rejects_changed_action_and_rejection_issues_no_token(
     assert rejected.status_code == 200
     assert rejected.json()["status"] == "rejected"
     assert rejected.json()["authorization_token"] is None
+
+
+def test_admin_rotates_scoped_identity_and_revocation_is_immediate(
+    client: TestClient,
+) -> None:
+    issued = client.post(
+        "/v1/admin/identities",
+        headers={"X-API-Key": ADMIN_KEY},
+        json={"principal_id": "scanner-ci", "scopes": ["scan"], "ttl_seconds": 3600},
+    )
+    assert issued.status_code == 201
+    body = issued.json()
+    assert body["api_key"].startswith("exk_")
+    scoped_headers = {"X-API-Key": body["api_key"]}
+    scan = client.post("/v1/scan", headers=scoped_headers, json={"text": "Hello"})
+    assert scan.status_code == 200
+    authorize = client.post(
+        "/v1/actions/authorize",
+        headers=scoped_headers,
+        json={
+            "context": {
+                "agent_id": "warehouse-copilot",
+                "principal_id": "operator-42",
+                "environment": "production",
+            },
+            "action": {"tool": "inventory_db", "operation": "read", "resource": "stock_levels"},
+        },
+    )
+    assert authorize.status_code == 401
+
+    revoked = client.delete(
+        f"/v1/admin/identities/{body['key_id']}",
+        headers={"X-API-Key": ADMIN_KEY},
+    )
+    assert revoked.status_code == 204
+    scan_after_revoke = client.post(
+        "/v1/scan", headers=scoped_headers, json={"text": "Hello"}
+    )
+    assert scan_after_revoke.status_code == 401
 
 
 def test_customer_export_is_blocked(client: TestClient) -> None:

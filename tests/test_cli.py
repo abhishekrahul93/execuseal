@@ -31,3 +31,10 @@ def test_invalid_policy_returns_usage_error(tmp_path: Path, capsys: object) -> N
     path.write_text("version: 99\nrules: []", encoding="utf-8")
 
     assert main(["policy", "validate", str(path)]) == 2
+
+
+def test_database_upgrade_is_idempotent(tmp_path: Path, capsys: object) -> None:
+    database_url = f"sqlite:///{tmp_path / 'cli.db'}"
+
+    assert main(["db", "upgrade", "--database-url", database_url]) == 0
+    assert main(["db", "upgrade", "--database-url", database_url]) == 0

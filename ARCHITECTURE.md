@@ -119,3 +119,18 @@ changed arguments fail digest verification. SQL performs a conditional state
 transition from `pending` to `approved` or `rejected`, making the decision
 single-use under concurrent requests. Requests expire, and only an approved
 request receives a short-lived execution token.
+
+## Decision ADR-012: scoped, revocable service identities
+
+API keys are represented by SHA-256 digests in SQL and map to a principal,
+explicit scopes, optional expiry, and revocation state. Raw generated keys are
+returned once. Authentication checks scope and lifecycle state on every request,
+so revocation applies immediately across workers. Bootstrap agent and admin keys
+are separated and receive different fixed scopes.
+
+## Decision ADR-013: versioned, fail-closed schema changes
+
+Ordered migrations are recorded in `schema_migrations`. Development can apply
+missing migrations automatically; production startup only verifies the expected
+version and refuses service when the schema is absent or stale. Deployment runs
+`execuseal db upgrade` before starting the gateway.

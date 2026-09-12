@@ -2,8 +2,13 @@ services:
   gateway:
     build: .
     restart: unless-stopped
+    command:
+      - sh
+      - -c
+      - execuseal db upgrade --database-url "$$EXECUSEAL_DATABASE_URL" && exec uvicorn execuseal.api:create_app --factory --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips="*"
     environment:
       EXECUSEAL_API_KEYS: ${EXECUSEAL_API_KEYS:?Set EXECUSEAL_API_KEYS to a strong random value}
+      EXECUSEAL_ADMIN_API_KEYS: ${EXECUSEAL_ADMIN_API_KEYS:?Set a separate admin key}
       EXECUSEAL_REVIEWER_API_KEYS: ${EXECUSEAL_REVIEWER_API_KEYS:?Set a separate reviewer key}
       EXECUSEAL_POLICY_PATH: /app/policies/warehouse.yml
       EXECUSEAL_DATABASE_URL: postgresql+psycopg://execuseal:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/execuseal

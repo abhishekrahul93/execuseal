@@ -88,6 +88,8 @@ operational-agent example.
 - exact-action approval binding and atomic approve/reject transitions
 - Ed25519 authorization signatures with key IDs and rotation support
 - durable SQL replay prevention across workers and restarts
+- SQL-backed scoped service identities with expiry and revocation
+- versioned database migrations and one-time key issuance
 
 ## API gateway
 
@@ -96,6 +98,7 @@ tool credentials and never executes the action.
 
 ```bash
 export EXECUSEAL_API_KEYS="replace-with-a-long-random-secret"
+export EXECUSEAL_ADMIN_API_KEYS="use-a-different-admin-secret"
 export EXECUSEAL_REVIEWER_API_KEYS="use-a-different-reviewer-secret"
 export EXECUSEAL_POLICY_PATH="policies/warehouse.yml"
 # Generate a private key with: openssl rand -base64 32
@@ -137,10 +140,19 @@ API surface:
 | `POST /v1/actions/authorize` | API key | Pre-execution tool-action decision |
 | `GET /v1/approvals/{id}` | Reviewer key | Inspect approval metadata |
 | `POST /v1/approvals/{id}/decision` | Reviewer key | Approve or reject an exact action |
+| `POST /v1/admin/identities` | `admin` scope | Issue a scoped key once |
+| `DELETE /v1/admin/identities/{id}` | `admin` scope | Revoke a key immediately |
 
-API keys are suitable only for this initial service boundary. Production
-identity will require scoped principals, rotation, revocation, and a managed
-secret store.
+Bootstrap agent keys receive only `scan` and `authorize`; bootstrap admin keys
+receive only `admin`. Administrators can issue expiring keys with the minimum
+required scopes. Raw keys are returned once and only SHA-256 digests are stored.
+Rotate by creating a replacement, updating the client, and revoking the old key.
+
+Production startup requires the current schema. Apply migrations first:
+
+```bash
+execuseal db upgrade --database-url "$EXECUSEAL_DATABASE_URL"
+```
 
 Allowed action responses include a short-lived Ed25519-signed `authorization_token`. The token
 is bound to the exact agent identity, principal, environment, tool metadata and

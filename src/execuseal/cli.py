@@ -9,6 +9,7 @@ from pathlib import Path
 from execuseal.benchmark import BenchmarkFormatError, BenchmarkRunner
 from execuseal.config import PolicyConfigError, load_policy
 from execuseal.engine import SafetyEngine
+from execuseal.migrations import upgrade
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -30,6 +31,10 @@ def build_parser() -> argparse.ArgumentParser:
     policy_commands = policy.add_subparsers(dest="policy_command", required=True)
     validate = policy_commands.add_parser("validate", help="Validate a YAML/JSON policy")
     validate.add_argument("path", type=Path)
+    database = subcommands.add_parser("db", help="Database schema operations")
+    database_commands = database.add_subparsers(dest="database_command", required=True)
+    upgrade_parser = database_commands.add_parser("upgrade", help="Apply schema migrations")
+    upgrade_parser.add_argument("--database-url", required=True)
     return parser
 
 
@@ -40,6 +45,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _scan(args)
         if args.command == "test":
             return _test(args)
+        if args.command == "db":
+            applied = upgrade(args.database_url)
+            print("Applied: " + ", ".join(applied) if applied else "Database is current")
+            return 0
         return _validate_policy(args)
     except (OSError, PolicyConfigError, BenchmarkFormatError, ValueError) as error:
         print(f"error: {error}", file=sys.stderr)

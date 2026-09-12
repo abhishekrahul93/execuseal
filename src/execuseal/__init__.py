@@ -19,6 +19,8 @@ from execuseal.blast_radius import BlastRadius, BlastRadiusAssessor
 from execuseal.config import PolicyConfigError, load_policy, parse_policy
 from execuseal.engine import SafetyEngine
 from execuseal.firewall import ActionDecision, ActionFirewall
+from execuseal.identities import IssuedIdentity, ServiceIdentity, SqlIdentityStore
+from execuseal.migrations import LATEST_SCHEMA_VERSION, require_current, upgrade
 from execuseal.models import Action, Finding, SafetyDecision
 from execuseal.policy import PolicyEngine, PolicyResult, PolicyRule, PolicySet
 from execuseal.tokens import (
@@ -50,6 +52,8 @@ __all__ = [
     "Environment",
     "Finding",
     "Impact",
+    "IssuedIdentity",
+    "LATEST_SCHEMA_VERSION",
     "PolicyEngine",
     "PolicyConfigError",
     "PolicyResult",
@@ -57,10 +61,14 @@ __all__ = [
     "PolicySet",
     "SafetyDecision",
     "SafetyEngine",
+    "ServiceIdentity",
     "SqlApprovalStore",
+    "SqlIdentityStore",
     "SqlReplayGuard",
     "ToolAction",
     "TokenError",
     "load_policy",
     "parse_policy",
+    "require_current",
+    "upgrade",
 ]

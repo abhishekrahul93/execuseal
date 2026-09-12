@@ -65,6 +65,7 @@ jobs:
       - name: Validate Compose
         env:
           EXECUSEAL_API_KEYS: ci-validation-key-not-for-production
+          EXECUSEAL_ADMIN_API_KEYS: ci-admin-key-not-for-production
           EXECUSEAL_REVIEWER_API_KEYS: ci-reviewer-key-not-for-production
           EXECUSEAL_SIGNING_KEYS_JSON: '{"ci-key":"Y2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2M="}'
           EXECUSEAL_ACTIVE_SIGNING_KEY_ID: ci-key

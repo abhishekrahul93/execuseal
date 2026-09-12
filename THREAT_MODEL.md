@@ -63,3 +63,9 @@ IDs permit rotation. They do not protect a stolen signing key or a verifier that
 fails to consume tokens through the shared SQL replay store. Key distribution
 must be authenticated, private keys must use managed secret storage, and a
 compromised key must be removed after its outstanding tokens expire.
+
+Scoped identities reduce damage from a leaked key but do not replace network
+controls or a managed secret store. An administrator can mint powerful keys, so
+admin credentials are a high-value trust boundary. Migration state is checked
+before production startup to prevent code from running against an ambiguous or
+partially upgraded schema.

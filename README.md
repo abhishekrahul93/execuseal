@@ -81,6 +81,9 @@ operational-agent example.
 - SQL-backed audit persistence with PostgreSQL write serialization
 - per-key rate limiting and privacy-safe JSON request logs
 - hardened non-root container and PostgreSQL Compose stack
+- MCP `tools/call` interception with policy enforcement before execution
+- short-lived authorization tokens bound to exact action arguments and identity
+- replay rejection preventing reuse of an authorization decision
 
 ## API gateway
 
@@ -127,6 +130,29 @@ API surface:
 API keys are suitable only for this initial service boundary. Production
 identity will require scoped principals, rotation, revocation, and a managed
 secret store.
+
+Allowed action responses include a short-lived `authorization_token`. The token
+is bound to the exact agent identity, principal, environment, tool metadata and
+arguments. Changing an argument invalidates it, expiration is enforced, and a
+token cannot be consumed twice within one gateway process.
+
+## MCP interception
+
+`McpSafetyProxy` accepts the current JSON-RPC `tools/call` shape, converts a
+trusted tool profile into a proposed action, applies policy, records the audit
+decision, and invokes the downstream handler only after issuing and consuming a
+valid action-bound token.
+
+```bash
+python examples/unsafe_mcp_agent.py
+```
+
+The demonstration attempts to export customer records to an external URL. It
+must report `decision: block` and `Downstream executions: 0`.
+
+The adapter implements the tool-call interception contract, not a complete MCP
+transport, discovery server or official SDK replacement. MCP annotations and
+model-supplied metadata are not trusted as authorization policy.
 
 ## CLI
 

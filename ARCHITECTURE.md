@@ -90,3 +90,22 @@ is a development option; production configuration refuses it.
 Authenticated requests use a thread-safe, per-key fixed-window limiter. Keys
 are represented internally by SHA-256 fingerprints and never logged. A shared
 rate-limit backend remains required for distributed deployment.
+
+## Decision ADR-009: bind authorization to the exact action
+
+An allowed action may receive a compact HMAC-SHA256 token containing a digest
+of verified identity, environment, tool, resource, classification, impact and
+arguments. Tokens expire within a bounded interval and are single-use. This
+prevents changing arguments between authorization and execution and blocks
+simple replay within one process.
+
+HMAC is appropriate for the initial co-located gateway/enforcer design. A
+distributed architecture should use asymmetric signatures, key identifiers,
+rotation, an external replay store and explicit audience/issuer claims.
+
+## Decision ADR-010: MCP metadata is untrusted
+
+The MCP adapter handles JSON-RPC `tools/call` requests. Security attributes come
+from locally trusted tool profiles, never tool descriptions, annotations or
+model-supplied arguments. Denied and review-required calls return tool execution
+errors and never invoke the downstream handler.

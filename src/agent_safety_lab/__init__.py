@@ -15,6 +15,7 @@ from agent_safety_lab.engine import SafetyEngine
 from agent_safety_lab.firewall import ActionDecision, ActionFirewall
 from agent_safety_lab.models import Action, Finding, SafetyDecision
 from agent_safety_lab.policy import PolicyEngine, PolicyResult, PolicyRule, PolicySet
+from agent_safety_lab.tokens import AuthorizationClaims, AuthorizationSigner, TokenError
 
 __all__ = [
     "Action",
@@ -23,6 +24,8 @@ __all__ = [
     "ActionFirewall",
     "AuditChain",
     "AuditRecord",
+    "AuthorizationClaims",
+    "AuthorizationSigner",
     "BenchmarkResult",
     "BenchmarkRunner",
     "BlastRadius",
@@ -39,6 +42,7 @@ __all__ = [
     "SafetyDecision",
     "SafetyEngine",
     "ToolAction",
+    "TokenError",
     "load_policy",
     "parse_policy",
 ]

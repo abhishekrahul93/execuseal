@@ -30,6 +30,7 @@ from agent_safety_lab.engine import SafetyEngine
 from agent_safety_lab.firewall import ActionFirewall
 from agent_safety_lab.policy import PolicyEngine
 from agent_safety_lab.rate_limit import RateLimiter
+from agent_safety_lab.tokens import AuthorizationSigner
 
 API_VERSION = "v1"
 PACKAGE_VERSION = "0.1.0a0"
@@ -48,6 +49,8 @@ class GatewaySettings:
     rate_limit_requests: int = 120
     rate_limit_window_seconds: int = 60
     deployment_environment: str = "development"
+    signing_secret: str = "development-signing-secret-change-me-32-bytes"
+    token_ttl_seconds: int = 30
 
     def __post_init__(self) -> None:
         if not self.api_keys or any(len(key) < 16 for key in self.api_keys):
@@ -58,6 +61,12 @@ class GatewaySettings:
             ("postgresql://", "postgresql+psycopg://")
         ):
             raise ValueError("Production requires a PostgreSQL database URL")
+        if len(self.signing_secret.encode()) < 32:
+            raise ValueError("Signing secret must contain at least 32 bytes")
+        if self.deployment_environment == "production" and self.signing_secret.startswith(
+            "development-"
+        ):
+            raise ValueError("Production requires a non-development signing secret")
 
     @classmethod
     def from_environment(cls) -> "GatewaySettings":
@@ -76,6 +85,8 @@ class GatewaySettings:
             int(os.getenv("ASL_RATE_LIMIT_REQUESTS", "120")),
             int(os.getenv("ASL_RATE_LIMIT_WINDOW_SECONDS", "60")),
             os.getenv("ASL_ENVIRONMENT", "development"),
+            os.getenv("ASL_SIGNING_SECRET", ""),
+            int(os.getenv("ASL_TOKEN_TTL_SECONDS", "30")),
         )
 
 
@@ -140,6 +151,7 @@ class AuthorizeResponse(StrictModel):
     reason: str
     blast_radius: BlastRadiusResponse
     audit_hash: str
+    authorization_token: str | None
 
 
 class StatusResponse(StrictModel):
@@ -154,6 +166,7 @@ class GatewayState:
     action_firewall: ActionFirewall
     audit_store: SqlAuditStore
     rate_limiter: RateLimiter
+    signer: AuthorizationSigner
 
 
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
@@ -173,6 +186,10 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
         rate_limiter=RateLimiter(
             active_settings.rate_limit_requests,
             active_settings.rate_limit_window_seconds,
+        ),
+        signer=AuthorizationSigner(
+            active_settings.signing_secret,
+            active_settings.token_ttl_seconds,
         ),
     )
     app = FastAPI(
@@ -316,6 +333,11 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
                 reasons=list(decision.blast_radius.reasons),
             ),
             audit_hash=audit.record_hash,
+            authorization_token=(
+                gateway.signer.issue(action, context, decision.action)
+                if decision.execution_allowed
+                else None
+            ),
         )
 
     return app

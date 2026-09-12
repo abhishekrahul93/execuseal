@@ -16,6 +16,9 @@
 - [x] PostgreSQL-backed hash-chain audit persistence
 - [x] Single-instance rate limiting and structured request logs
 - [x] Hardened Docker image and PostgreSQL Compose stack
+- [x] MCP `tools/call` interception baseline
+- [x] Action-bound signed decisions with expiry and replay protection
+- [x] Unsafe warehouse-agent execution proof
 
 ## v0.2 — agent action security
 

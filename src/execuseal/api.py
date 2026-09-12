@@ -38,8 +38,9 @@ from execuseal.firewall import ActionFirewall
 from execuseal.identities import ServiceIdentity, SqlIdentityStore
 from execuseal.migrations import require_current, upgrade
 from execuseal.models import Action
+from execuseal.observability import GatewayMetrics
 from execuseal.policy import PolicyEngine
-from execuseal.rate_limit import RateLimiter
+from execuseal.rate_limit import SqlRateLimiter
 from execuseal.tokens import AuthorizationSigner, SqlReplayGuard, action_digest
 
 API_VERSION = "v1"
@@ -67,6 +68,7 @@ class GatewaySettings:
     reviewer_api_keys: tuple[str, ...] = ()
     approval_ttl_seconds: int = 900
     admin_api_keys: tuple[str, ...] = ()
+    metrics_api_keys: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.api_keys or any(len(key) < 16 for key in self.api_keys):
@@ -100,6 +102,15 @@ class GatewaySettings:
             raise ValueError("Agent and admin API keys must be separate")
         if self.deployment_environment == "production" and not self.admin_api_keys:
             raise ValueError("Production requires at least one admin API key")
+        if any(len(key) < 16 for key in self.metrics_api_keys):
+            raise ValueError("Metrics API keys must contain 16 or more characters")
+        privileged_keys = set(self.api_keys) | set(self.reviewer_api_keys) | set(
+            self.admin_api_keys
+        )
+        if privileged_keys & set(self.metrics_api_keys):
+            raise ValueError("Metrics API keys must be separate from other credentials")
+        if self.deployment_environment == "production" and not self.metrics_api_keys:
+            raise ValueError("Production requires at least one metrics API key")
 
     @classmethod
     def from_environment(cls) -> "GatewaySettings":
@@ -134,6 +145,11 @@ class GatewaySettings:
             tuple(
                 key.strip()
                 for key in os.getenv("EXECUSEAL_ADMIN_API_KEYS", "").split(",")
+                if key.strip()
+            ),
+            tuple(
+                key.strip()
+                for key in os.getenv("EXECUSEAL_METRICS_API_KEYS", "").split(",")
                 if key.strip()
             ),
         )
@@ -275,9 +291,10 @@ class GatewayState:
     action_firewall: ActionFirewall
     audit_store: SqlAuditStore
     approval_store: SqlApprovalStore
-    rate_limiter: RateLimiter
+    rate_limiter: SqlRateLimiter
     signer: AuthorizationSigner
     identity_store: SqlIdentityStore
+    metrics: GatewayMetrics
 
 
 api_key_header = APIKeyHeader(
@@ -288,6 +305,11 @@ api_key_header = APIKeyHeader(
 reviewer_key_header = APIKeyHeader(
     name="X-Reviewer-Key",
     scheme_name="ReviewerApiKey",
+    auto_error=False,
+)
+metrics_key_header = APIKeyHeader(
+    name="X-Metrics-Key",
+    scheme_name="MetricsApiKey",
     auto_error=False,
 )
 
@@ -321,7 +343,8 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
         action_firewall=ActionFirewall(PolicyEngine(policy)),
         audit_store=audit_store,
         approval_store=approval_store,
-        rate_limiter=RateLimiter(
+        rate_limiter=SqlRateLimiter(
+            active_settings.database_url,
             active_settings.rate_limit_requests,
             active_settings.rate_limit_window_seconds,
         ),
@@ -332,7 +355,9 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
             active_settings.token_ttl_seconds,
         ),
         identity_store=identity_store,
+        metrics=GatewayMetrics(),
     )
+    gateway.rate_limiter.initialize()
     app = FastAPI(
         title="ExecuSeal Gateway",
         description="Pre-execution policy firewall for AI-agent prompts and tool actions.",
@@ -362,6 +387,7 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
         request.state.request_id = request_id
         started = time.perf_counter()
         response = await call_next(request)
+        duration = time.perf_counter() - started
         response.headers["X-Request-ID"] = request_id
         response.headers["Cache-Control"] = "no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
@@ -373,11 +399,18 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
                     "method": request.method,
                     "path": request.url.path,
                     "status_code": response.status_code,
-                    "duration_ms": round((time.perf_counter() - started) * 1000, 3),
+                    "duration_ms": round(duration * 1000, 3),
                 },
                 separators=(",", ":"),
             )
         )
+        route = request.scope.get("route")
+        route_path = getattr(route, "path", "unmatched")
+        if route_path != "/metrics":
+            gateway.metrics.requests.labels(
+                request.method, route_path, str(response.status_code)
+            ).inc()
+            gateway.metrics.duration.labels(request.method, route_path).observe(duration)
         return response
 
     def require_scope(required_scope: str) -> Callable[..., ServiceIdentity]:
@@ -388,17 +421,19 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
                 else None
             )
             if identity is None:
+                gateway.metrics.auth_failures.labels("api_key").inc()
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Invalid, expired, revoked, or insufficiently scoped API key",
                     headers={"WWW-Authenticate": "ApiKey"},
                 )
-            allowed, _remaining = gateway.rate_limiter.allow(identity.key_id)
+            allowed, _remaining, retry_after = gateway.rate_limiter.allow(identity.key_id)
             if not allowed:
+                gateway.metrics.rate_limited.labels("service_identity").inc()
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                     detail="Rate limit exceeded",
-                    headers={"Retry-After": str(active_settings.rate_limit_window_seconds)},
+                    headers={"Retry-After": str(retry_after)},
                 )
             return identity
 
@@ -413,6 +448,7 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
             hmac.compare_digest(key, valid) for valid in active_settings.reviewer_api_keys
         )
         if not valid_key:
+            gateway.metrics.auth_failures.labels("reviewer_key").inc()
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid or missing reviewer key",
@@ -420,14 +456,29 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
             )
         assert key is not None
         reviewer_id = hashlib.sha256(key.encode()).hexdigest()[:16]
-        allowed, _remaining = gateway.rate_limiter.allow(f"reviewer:{reviewer_id}")
+        allowed, _remaining, retry_after = gateway.rate_limiter.allow(
+            f"reviewer:{reviewer_id}"
+        )
         if not allowed:
+            gateway.metrics.rate_limited.labels("reviewer").inc()
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail="Rate limit exceeded",
-                headers={"Retry-After": str(active_settings.rate_limit_window_seconds)},
+                headers={"Retry-After": str(retry_after)},
             )
         return reviewer_id
+
+    def require_metrics_key(key: str | None = Security(metrics_key_header)) -> None:
+        valid_key = key is not None and any(
+            hmac.compare_digest(key, valid) for valid in active_settings.metrics_api_keys
+        )
+        if not valid_key:
+            gateway.metrics.auth_failures.labels("metrics_key").inc()
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or missing metrics key",
+                headers={"WWW-Authenticate": "ApiKey"},
+            )
 
     @app.get("/healthz", response_model=StatusResponse, tags=["operations"])
     def health() -> StatusResponse:
@@ -435,9 +486,19 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
 
     @app.get("/readyz", response_model=StatusResponse, tags=["operations"])
     def ready() -> StatusResponse:
-        if not gateway.audit_store.verify():
-            raise HTTPException(status_code=503, detail="Audit chain verification failed")
+        if not gateway.rate_limiter.ping() or not gateway.audit_store.verify():
+            gateway.metrics.ready.set(0)
+            raise HTTPException(status_code=503, detail="Dependency readiness check failed")
+        gateway.metrics.ready.set(1)
         return StatusResponse(status="ready", version=PACKAGE_VERSION, api_version=API_VERSION)
+
+    @app.get(
+        "/metrics",
+        dependencies=[Depends(require_metrics_key)],
+        include_in_schema=False,
+    )
+    def metrics() -> Response:
+        return Response(content=gateway.metrics.render(), media_type=GatewayMetrics.content_type)
 
     @app.get(
         "/.well-known/execuseal-keys.json",
@@ -459,6 +520,7 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
     )
     def scan(payload: ScanRequest, request: Request) -> ScanResponse:
         decision = gateway.prompt_engine.evaluate(payload.text)
+        gateway.metrics.decisions.labels("prompt", decision.action.value).inc()
         return ScanResponse(
             request_id=request.state.request_id,
             action=decision.action.value,
@@ -483,6 +545,7 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
     def authorize(payload: AuthorizeRequest, request: Request) -> AuthorizeResponse:
         context, action = _domain_action(payload.context, payload.action)
         decision = gateway.action_firewall.authorize(action, context)
+        gateway.metrics.decisions.labels("tool_action", decision.action.value).inc()
         audit = gateway.audit_store.append(
             str(uuid.uuid4()),
             action,

@@ -2,13 +2,18 @@ from pathlib import Path
 
 import pytest
 
-from execuseal.migrations import LATEST_SCHEMA_VERSION, require_current, upgrade
+from execuseal.migrations import (
+    INITIAL_SCHEMA_VERSION,
+    LATEST_SCHEMA_VERSION,
+    require_current,
+    upgrade,
+)
 
 
 def test_migration_is_versioned_and_idempotent(tmp_path: Path) -> None:
     database_url = f"sqlite:///{tmp_path / 'schema.db'}"
 
-    assert upgrade(database_url) == (LATEST_SCHEMA_VERSION,)
+    assert upgrade(database_url) == (INITIAL_SCHEMA_VERSION, LATEST_SCHEMA_VERSION)
     assert upgrade(database_url) == ()
     require_current(database_url)
 

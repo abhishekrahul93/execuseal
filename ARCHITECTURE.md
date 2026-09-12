@@ -87,9 +87,8 @@ is a development option; production configuration refuses it.
 
 ## Decision ADR-008: bounded single-instance traffic
 
-Authenticated requests use a thread-safe, per-key fixed-window limiter. Keys
-are represented internally by SHA-256 fingerprints and never logged. A shared
-rate-limit backend remains required for distributed deployment.
+Superseded by ADR-015. The first gateway used a process-local fixed-window
+limiter and was intentionally unsuitable for horizontal scaling.
 
 ## Decision ADR-009: asymmetric, action-bound authorization
 
@@ -142,3 +141,16 @@ with a dedicated Ed25519 key. Verification proves the current database still
 contains the exact historical prefix represented by that checkpoint. Checkpoint
 JSON must be copied to storage outside the database trust boundary; keeping it
 only beside the database provides no rollback protection.
+
+## Decision ADR-015: shared limits and bounded telemetry
+
+Rate-limit windows are stored in SQL and updated with an atomic dialect-native
+upsert. Every gateway replica using the same PostgreSQL database therefore
+enforces one limit per hashed identity. Raw credentials and identities are not
+stored in the rate-limit table.
+
+Each application owns a Prometheus registry containing request count and
+latency, authentication failure, throttling, safety-decision, and readiness
+signals. Labels use only bounded enums and route templates, preventing secrets
+and user-controlled cardinality from entering telemetry. Metrics use a
+dedicated credential and are omitted from the public API schema.

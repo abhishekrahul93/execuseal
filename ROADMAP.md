@@ -23,13 +23,14 @@
 - [x] Ed25519 signing, key rotation, and durable replay prevention
 - [x] Schema migrations and scoped service-identity lifecycle
 - [x] Signed external audit checkpoints and offline verification
+- [x] Distributed SQL-backed rate limiting across gateway replicas
+- [x] Protected low-cardinality Prometheus metrics and readiness checks
 
 ## v0.2 — agent action security
 
 - resource patterns, principal scopes, quotas, and time constraints
 - secrets and PII detectors with redaction
 - signed audit checkpoints and durable storage adapter
-- distributed rate limiting
 - indirect prompt-injection benchmark
 
 ## v0.3 — integrations and evaluation

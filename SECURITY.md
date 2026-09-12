@@ -39,3 +39,11 @@ The included container runs as a non-root user with a read-only filesystem and
 dropped capabilities. The Compose port binds to localhost; do not expose it
 publicly without TLS, network policy, monitoring, secret management, backups,
 and an incident-response plan.
+
+## Operational telemetry
+
+Protect `/metrics` with a dedicated `EXECUSEAL_METRICS_API_KEYS` credential and
+restrict it at the network layer to the monitoring system. Metrics intentionally
+exclude prompts, parameters, identity values, and resource names. Treat request
+logs and aggregate safety decisions as security-sensitive operational data;
+apply access controls and a documented retention period.

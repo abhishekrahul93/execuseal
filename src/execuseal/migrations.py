@@ -6,9 +6,11 @@ from sqlalchemy.engine import Connection
 from execuseal.approvals import metadata as approval_metadata
 from execuseal.audit_store import metadata as audit_metadata
 from execuseal.identities import metadata as identity_metadata
+from execuseal.rate_limit import metadata as rate_limit_metadata
 from execuseal.tokens import metadata as token_metadata
 
-LATEST_SCHEMA_VERSION = "0001_initial"
+INITIAL_SCHEMA_VERSION = "0001_initial"
+LATEST_SCHEMA_VERSION = "0002_distributed_rate_limits"
 metadata = MetaData()
 schema_migrations = Table(
     "schema_migrations",
@@ -24,8 +26,14 @@ def upgrade(database_url: str) -> tuple[str, ...]:
     with engine.begin() as connection:
         metadata.create_all(connection)
         versions = set(connection.execute(select(schema_migrations.c.version)).scalars())
-        if LATEST_SCHEMA_VERSION not in versions:
+        if INITIAL_SCHEMA_VERSION not in versions:
             _initial_schema(connection)
+            connection.execute(
+                schema_migrations.insert().values(version=INITIAL_SCHEMA_VERSION)
+            )
+            applied.append(INITIAL_SCHEMA_VERSION)
+        if LATEST_SCHEMA_VERSION not in versions:
+            rate_limit_metadata.create_all(connection)
             connection.execute(
                 schema_migrations.insert().values(version=LATEST_SCHEMA_VERSION)
             )
@@ -57,6 +65,7 @@ def require_current(database_url: str) -> None:
         "approval_requests",
         "consumed_tokens",
         "service_identities",
+        "rate_limit_windows",
     }
     if not required_tables <= table_names:
         raise RuntimeError("Database schema is incomplete; run `execuseal db upgrade`")

@@ -17,6 +17,7 @@ from execuseal import (
 from execuseal.audit_store import SqlAuditStore
 from execuseal.identities import SqlIdentityStore
 from execuseal.migrations import require_current, upgrade
+from execuseal.rate_limit import SqlRateLimiter
 from execuseal.tokens import AuthorizationSigner, SqlReplayGuard, TokenError
 
 POSTGRES_URL = os.getenv("EXECUSEAL_TEST_POSTGRES_URL")
@@ -74,3 +75,18 @@ def test_postgresql_migration_and_identity_revocation() -> None:
     assert store.revoke(issued.identity.key_id)
     assert store.authenticate(issued.api_key, "scan") is None
     store.close()
+
+
+@pytest.mark.skipif(not POSTGRES_URL, reason="PostgreSQL integration URL not configured")
+def test_postgresql_rate_limit_is_shared_across_workers() -> None:
+    assert POSTGRES_URL is not None
+    identity = f"integration-{uuid4()}"
+    first = SqlRateLimiter(POSTGRES_URL, 2, 60)
+    second = SqlRateLimiter(POSTGRES_URL, 2, 60)
+    first.initialize()
+
+    assert first.allow(identity, now=1)[:2] == (True, 1)
+    assert second.allow(identity, now=2)[:2] == (True, 0)
+    assert first.allow(identity, now=3)[:2] == (False, 0)
+    first.close()
+    second.close()

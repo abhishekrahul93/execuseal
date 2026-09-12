@@ -9,6 +9,7 @@ from execuseal.api import GatewaySettings, create_app
 API_KEY = "test-key-at-least-16-characters"
 REVIEWER_KEY = "reviewer-key-at-least-16-characters"
 ADMIN_KEY = "admin-key-at-least-16-characters"
+METRICS_KEY = "metrics-key-at-least-16-characters"
 
 
 @pytest.fixture
@@ -22,6 +23,7 @@ def client(tmp_path: Path) -> TestClient:
             database_url=database_url,
             reviewer_api_keys=(REVIEWER_KEY,),
             admin_api_keys=(ADMIN_KEY,),
+            metrics_api_keys=(METRICS_KEY,),
         )
     )
     return TestClient(app)
@@ -42,6 +44,23 @@ def test_health_is_public_and_disables_caching(client: TestClient) -> None:
     assert response.json()["status"] == "ok"
     assert response.headers["cache-control"] == "no-store"
     assert response.headers["x-content-type-options"] == "nosniff"
+
+
+def test_metrics_are_protected_and_export_low_cardinality_series(
+    client: TestClient,
+) -> None:
+    assert client.get("/metrics").status_code == 401
+    client.get("/healthz")
+
+    response = client.get(
+        "/metrics",
+        headers={"X-Metrics-Key": METRICS_KEY},
+    )
+
+    assert response.status_code == 200
+    assert "execuseal_http_requests_total" in response.text
+    assert 'route="/healthz"' in response.text
+    assert "/metrics" not in response.text
 
 
 def test_public_verification_key_ring_contains_no_private_key(client: TestClient) -> None:
@@ -331,6 +350,12 @@ def test_settings_require_strong_unique_keys(tmp_path: Path) -> None:
             tmp_path / "policy.yml",
             active_signing_key_id="missing",
         )
+    with pytest.raises(ValueError, match="Metrics API keys must be separate"):
+        GatewaySettings(
+            (API_KEY,),
+            tmp_path / "policy.yml",
+            metrics_api_keys=(API_KEY,),
+        )
 
 
 def test_production_requires_postgresql(tmp_path: Path) -> None:
@@ -340,6 +365,20 @@ def test_production_requires_postgresql(tmp_path: Path) -> None:
             tmp_path / "policy.yml",
             database_url="sqlite:///audit.db",
             deployment_environment="production",
+        )
+
+
+def test_production_requires_dedicated_metrics_key(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="metrics API key"):
+        GatewaySettings(
+            (API_KEY,),
+            tmp_path / "policy.yml",
+            database_url="postgresql+psycopg://localhost/execuseal",
+            deployment_environment="production",
+            signing_keys_json='{"production":"unused-in-settings-validation"}',
+            active_signing_key_id="production",
+            reviewer_api_keys=(REVIEWER_KEY,),
+            admin_api_keys=(ADMIN_KEY,),
         )
 
 
@@ -360,7 +399,7 @@ def test_rate_limit_returns_429(tmp_path: Path) -> None:
     response = rate_client.post("/v1/scan", headers=auth_headers(), json={"text": "Hi"})
 
     assert response.status_code == 429
-    assert response.headers["retry-after"] == "60"
+    assert 1 <= int(response.headers["retry-after"]) <= 60
 
 
 def test_audit_records_survive_application_restart(tmp_path: Path) -> None:

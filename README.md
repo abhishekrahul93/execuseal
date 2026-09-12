@@ -79,7 +79,8 @@ operational-agent example.
 - versioned prompt scanning and pre-execution action-authorization endpoints
 - request correlation, defensive response headers, and audit hashes
 - SQL-backed audit persistence with PostgreSQL write serialization
-- per-key rate limiting and privacy-safe JSON request logs
+- atomic, SQL-backed per-identity rate limiting shared across gateway replicas
+- protected Prometheus metrics, dependency readiness, and privacy-safe JSON logs
 - hardened non-root container and PostgreSQL Compose stack
 - MCP `tools/call` interception with policy enforcement before execution
 - short-lived authorization tokens bound to exact action arguments and identity
@@ -101,6 +102,7 @@ tool credentials and never executes the action.
 export EXECUSEAL_API_KEYS="replace-with-a-long-random-secret"
 export EXECUSEAL_ADMIN_API_KEYS="use-a-different-admin-secret"
 export EXECUSEAL_REVIEWER_API_KEYS="use-a-different-reviewer-secret"
+export EXECUSEAL_METRICS_API_KEYS="use-a-different-metrics-secret"
 export EXECUSEAL_POLICY_PATH="policies/warehouse.yml"
 # Generate a private key with: openssl rand -base64 32
 export EXECUSEAL_SIGNING_KEYS_JSON='{"key-2026-09":"<base64-private-key>"}'
@@ -137,6 +139,7 @@ API surface:
 | `GET /healthz` | Public | Liveness |
 | `GET /readyz` | Public | Loaded policy readiness |
 | `GET /.well-known/execuseal-keys.json` | Public | Ed25519 verification key ring |
+| `GET /metrics` | Dedicated metrics key | Prometheus operational telemetry |
 | `POST /v1/scan` | API key | Explainable prompt-risk assessment |
 | `POST /v1/actions/authorize` | API key | Pre-execution tool-action decision |
 | `GET /v1/approvals/{id}` | Reviewer key | Inspect approval metadata |
@@ -191,6 +194,11 @@ binds the approval to the canonical action digest, records only metadata (not
 parameters), atomically permits one decision, and issues a token only after an
 approval. Agent API keys and reviewer keys must never overlap.
 
+Metrics require a third, separate credential in `X-Metrics-Key`. Exported
+labels are deliberately low-cardinality and exclude identities, resources,
+prompts, parameters, and keys. See [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md)
+for the metric contract and initial alert guidance.
+
 ## MCP interception
 
 `McpSafetyProxy` accepts the current JSON-RPC `tools/call` shape, converts a
@@ -234,13 +242,14 @@ Current ASB v0.1 baseline: **83.33/100 F1 across 22 synthetic cases**, with
 
 This project is pre-alpha. Hash chaining makes later modification detectable;
 it does not by itself prevent deletion, rollback, or replacement of the entire
-audit log. Production use will require signed checkpoints and durable external
-storage.
+audit log. Production operators must create signed checkpoints regularly and
+retain them in durable storage outside the database trust boundary.
 
 SQLite is supported for local development. Production mode refuses to start
 without PostgreSQL. PostgreSQL writes use a transaction advisory lock so
-concurrent workers extend one hash chain. Schema migrations and signed external
-checkpoints are still required before stable release.
+concurrent workers extend one hash chain. Automated checkpoint retention,
+restore exercises, and a supported migration policy are still required before
+stable release.
 
 ## Container quick start
 
@@ -252,8 +261,9 @@ docker compose up --build
 
 Compose binds the gateway to localhost, runs it as an unprivileged user with a
 read-only filesystem and dropped Linux capabilities, and waits for PostgreSQL
-health. Put TLS or managed ingress in front before wider exposure. The current
-rate limiter is process-local; horizontal scaling requires a shared backend.
+health. Put TLS or managed ingress in front before wider exposure. Rate-limit
+counters are atomically shared through the configured SQL database, so replicas
+enforce one limit per identity. Production continues to require PostgreSQL.
 
 See [THREAT_MODEL.md](THREAT_MODEL.md), [ARCHITECTURE.md](ARCHITECTURE.md), and
 [ROADMAP.md](ROADMAP.md).

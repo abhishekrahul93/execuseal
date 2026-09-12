@@ -64,3 +64,16 @@ Benchmarks use reviewable JSON Lines fixtures and calculate precision, recall,
 F1, false-positive rate, and mean detector latency at runtime. CI gates on F1
 because accuracy can hide failures in an imbalanced dataset. Benchmark results
 must always name the dataset version and may not be generalized beyond it.
+
+## Decision ADR-006: decision point, not execution proxy
+
+The FastAPI gateway receives action metadata and returns an authorization
+decision before execution. It does not receive downstream tool credentials and
+does not execute the proposed action. Host applications remain responsible for
+enforcing `execution_allowed=false`; future signed decision tokens will reduce
+the risk of a compromised host ignoring the result.
+
+The initial API uses API-key authentication, strict request schemas, bounded
+input sizes, request correlation, and no-store response headers. API keys are a
+bootstrap mechanism, not the final identity model. The process-local audit chain
+is explicitly non-production until a durable, concurrency-safe adapter exists.

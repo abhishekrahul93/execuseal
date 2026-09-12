@@ -75,6 +75,55 @@ operational-agent example.
 - validated, versioned YAML/JSON policy-as-code
 - reproducible JSONL safety benchmarks with confusion-matrix metrics
 - CI-ready CLI with meaningful exit codes
+- authenticated FastAPI gateway with OpenAPI documentation
+- versioned prompt scanning and pre-execution action-authorization endpoints
+- request correlation, defensive response headers, and audit hashes
+
+## API gateway
+
+The gateway decides whether a proposed action is allowed; it never possesses
+tool credentials and never executes the action.
+
+```bash
+export ASL_API_KEYS="replace-with-a-long-random-secret"
+export ASL_POLICY_PATH="policies/warehouse.yml"
+uvicorn agent_safety_lab.api:create_app --factory --host 127.0.0.1 --port 8000
+```
+
+Interactive OpenAPI documentation is available at `http://127.0.0.1:8000/docs`.
+Protected endpoints require `X-API-Key`:
+
+```bash
+curl -s http://127.0.0.1:8000/v1/actions/authorize \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $ASL_API_KEYS" \
+  -d '{
+    "context": {
+      "agent_id": "warehouse-copilot",
+      "principal_id": "operator-42",
+      "environment": "production"
+    },
+    "action": {
+      "tool": "inventory_db",
+      "operation": "update",
+      "resource": "stock_levels",
+      "impact": "multiple_records"
+    }
+  }'
+```
+
+API surface:
+
+| Endpoint | Authentication | Purpose |
+|---|---|---|
+| `GET /healthz` | Public | Liveness |
+| `GET /readyz` | Public | Loaded policy readiness |
+| `POST /v1/scan` | API key | Explainable prompt-risk assessment |
+| `POST /v1/actions/authorize` | API key | Pre-execution tool-action decision |
+
+API keys are suitable only for this initial service boundary. Production
+identity will require scoped principals, rotation, revocation, and a managed
+secret store.
 
 ## CLI
 
@@ -103,6 +152,10 @@ This project is pre-alpha. Hash chaining makes later modification detectable;
 it does not by itself prevent deletion, rollback, or replacement of the entire
 audit log. Production use will require signed checkpoints and durable external
 storage.
+
+The current audit chain is process-local and resets on restart. Multi-worker or
+production deployment must use a durable audit adapter before relying on audit
+continuity.
 
 See [THREAT_MODEL.md](THREAT_MODEL.md), [ARCHITECTURE.md](ARCHITECTURE.md), and
 [ROADMAP.md](ROADMAP.md).

@@ -11,7 +11,8 @@
 - [x] Validated YAML/JSON policy-as-code
 - [x] Structured attack fixtures and baseline metrics
 - [x] CLI with machine-readable output and CI exit codes
-- [ ] FastAPI gateway and OpenAPI contract
+- [x] Authenticated FastAPI gateway and OpenAPI contract
+- [x] Prompt and tool-action interception endpoints
 
 ## v0.2 — agent action security
 
@@ -19,6 +20,8 @@
 - secrets and PII detectors with redaction
 - signed audit checkpoints and durable storage adapter
 - approval workflow with expiry and separation of duties
+- scoped service identities and API-key rotation/revocation
+- durable audit adapter and concurrency-safe integrity checkpoints
 - indirect prompt-injection benchmark
 
 ## v0.3 — integrations and evaluation

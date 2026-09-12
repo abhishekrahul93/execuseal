@@ -77,3 +77,16 @@ The initial API uses API-key authentication, strict request schemas, bounded
 input sizes, request correlation, and no-store response headers. API keys are a
 bootstrap mechanism, not the final identity model. The process-local audit chain
 is explicitly non-production until a durable, concurrency-safe adapter exists.
+
+## Decision ADR-007: durable hash-chain serialization
+
+Audit records are persisted through SQLAlchemy. PostgreSQL transactions acquire
+an advisory lock before reading the chain head and inserting the next record,
+so concurrent gateway workers cannot create two successors for one hash. SQLite
+is a development option; production configuration refuses it.
+
+## Decision ADR-008: bounded single-instance traffic
+
+Authenticated requests use a thread-safe, per-key fixed-window limiter. Keys
+are represented internally by SHA-256 fingerprints and never logged. A shared
+rate-limit backend remains required for distributed deployment.

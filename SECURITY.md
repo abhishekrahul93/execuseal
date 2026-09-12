@@ -13,5 +13,11 @@ launched and publish a supported-version policy before the first stable release.
 
 The current API-key mechanism is an initial authenticated boundary. Use HTTPS,
 store keys outside source control, restrict network exposure, and rotate any key
-that may have leaked. The in-memory audit chain resets on process restart and is
-not suitable as the only production audit record.
+that may have leaked. PostgreSQL persistence is available, but external signed
+checkpoints are still required to detect deletion or replacement of the entire
+database.
+
+The included container runs as a non-root user with a read-only filesystem and
+dropped capabilities. The Compose port binds to localhost; do not expose it
+publicly without TLS, network policy, monitoring, secret management, backups,
+and an incident-response plan.

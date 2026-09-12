@@ -1,7 +1,11 @@
 """Authenticated FastAPI gateway for pre-execution AI-agent safety checks."""
 
+import hashlib
 import hmac
+import json
+import logging
 import os
+import time
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,11 +24,12 @@ from agent_safety_lab.actions import (
     Impact,
     ToolAction,
 )
-from agent_safety_lab.audit import AuditChain
+from agent_safety_lab.audit_store import SqlAuditStore
 from agent_safety_lab.config import load_policy
 from agent_safety_lab.engine import SafetyEngine
 from agent_safety_lab.firewall import ActionFirewall
 from agent_safety_lab.policy import PolicyEngine
+from agent_safety_lab.rate_limit import RateLimiter
 
 API_VERSION = "v1"
 PACKAGE_VERSION = "0.1.0a0"
@@ -39,12 +44,20 @@ class GatewaySettings:
     api_keys: tuple[str, ...]
     policy_path: Path
     cors_origins: tuple[str, ...] = ()
+    database_url: str = "sqlite:///agent_safety_lab.db"
+    rate_limit_requests: int = 120
+    rate_limit_window_seconds: int = 60
+    deployment_environment: str = "development"
 
     def __post_init__(self) -> None:
         if not self.api_keys or any(len(key) < 16 for key in self.api_keys):
             raise ValueError("At least one API key of 16 or more characters is required")
         if len(set(self.api_keys)) != len(self.api_keys):
             raise ValueError("API keys must be unique")
+        if self.deployment_environment == "production" and not self.database_url.startswith(
+            ("postgresql://", "postgresql+psycopg://")
+        ):
+            raise ValueError("Production requires a PostgreSQL database URL")
 
     @classmethod
     def from_environment(cls) -> "GatewaySettings":
@@ -55,7 +68,15 @@ class GatewaySettings:
             for origin in os.getenv("ASL_CORS_ORIGINS", "").split(",")
             if origin.strip()
         )
-        return cls(keys, policy_path, origins)
+        return cls(
+            keys,
+            policy_path,
+            origins,
+            os.getenv("ASL_DATABASE_URL", "sqlite:///agent_safety_lab.db"),
+            int(os.getenv("ASL_RATE_LIMIT_REQUESTS", "120")),
+            int(os.getenv("ASL_RATE_LIMIT_WINDOW_SECONDS", "60")),
+            os.getenv("ASL_ENVIRONMENT", "development"),
+        )
 
 
 class StrictModel(BaseModel):
@@ -131,7 +152,8 @@ class StatusResponse(StrictModel):
 class GatewayState:
     prompt_engine: SafetyEngine
     action_firewall: ActionFirewall
-    audit_chain: AuditChain
+    audit_store: SqlAuditStore
+    rate_limiter: RateLimiter
 
 
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
@@ -142,10 +164,16 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
 
     active_settings = settings or GatewaySettings.from_environment()
     policy = load_policy(active_settings.policy_path)
+    audit_store = SqlAuditStore(active_settings.database_url)
+    audit_store.initialize()
     gateway = GatewayState(
         prompt_engine=SafetyEngine(),
         action_firewall=ActionFirewall(PolicyEngine(policy)),
-        audit_chain=AuditChain(),
+        audit_store=audit_store,
+        rate_limiter=RateLimiter(
+            active_settings.rate_limit_requests,
+            active_settings.rate_limit_window_seconds,
+        ),
     )
     app = FastAPI(
         title="Agent Safety Lab Gateway",
@@ -174,10 +202,24 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
         supplied = request.headers.get("X-Request-ID", "")
         request_id = supplied if _valid_request_id(supplied) else str(uuid.uuid4())
         request.state.request_id = request_id
+        started = time.perf_counter()
         response = await call_next(request)
         response.headers["X-Request-ID"] = request_id
         response.headers["Cache-Control"] = "no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
+        logging.getLogger("agent_safety_lab.request").info(
+            json.dumps(
+                {
+                    "event": "http_request",
+                    "request_id": request_id,
+                    "method": request.method,
+                    "path": request.url.path,
+                    "status_code": response.status_code,
+                    "duration_ms": round((time.perf_counter() - started) * 1000, 3),
+                },
+                separators=(",", ":"),
+            )
+        )
         return response
 
     def require_api_key(key: str | None = Security(api_key_header)) -> None:
@@ -190,6 +232,15 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
                 detail="Invalid or missing API key",
                 headers={"WWW-Authenticate": "ApiKey"},
             )
+        assert key is not None
+        key_identity = hashlib.sha256(key.encode()).hexdigest()[:16]
+        allowed, _remaining = gateway.rate_limiter.allow(key_identity)
+        if not allowed:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Rate limit exceeded",
+                headers={"Retry-After": str(active_settings.rate_limit_window_seconds)},
+            )
 
     @app.get("/healthz", response_model=StatusResponse, tags=["operations"])
     def health() -> StatusResponse:
@@ -197,6 +248,8 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
 
     @app.get("/readyz", response_model=StatusResponse, tags=["operations"])
     def ready() -> StatusResponse:
+        if not gateway.audit_store.verify():
+            raise HTTPException(status_code=503, detail="Audit chain verification failed")
         return StatusResponse(status="ready", version=PACKAGE_VERSION, api_version=API_VERSION)
 
     @app.post(
@@ -244,8 +297,8 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
             payload.action.parameters,
         )
         decision = gateway.action_firewall.authorize(action, context)
-        audit = gateway.audit_chain.append(
-            request.state.request_id,
+        audit = gateway.audit_store.append(
+            str(uuid.uuid4()),
             action,
             context,
             decision,

@@ -13,6 +13,9 @@
 - [x] CLI with machine-readable output and CI exit codes
 - [x] Authenticated FastAPI gateway and OpenAPI contract
 - [x] Prompt and tool-action interception endpoints
+- [x] PostgreSQL-backed hash-chain audit persistence
+- [x] Single-instance rate limiting and structured request logs
+- [x] Hardened Docker image and PostgreSQL Compose stack
 
 ## v0.2 — agent action security
 
@@ -21,7 +24,8 @@
 - signed audit checkpoints and durable storage adapter
 - approval workflow with expiry and separation of duties
 - scoped service identities and API-key rotation/revocation
-- durable audit adapter and concurrency-safe integrity checkpoints
+- schema migrations and signed external integrity checkpoints
+- distributed rate limiting
 - indirect prompt-injection benchmark
 
 ## v0.3 — integrations and evaluation

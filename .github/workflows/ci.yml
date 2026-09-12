@@ -30,3 +30,42 @@ jobs:
         run: pytest
       - name: Safety benchmark gate
         run: agentsafety test benchmarks/v0.1.jsonl --minimum-score 80
+
+  postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: agentsafety_test
+          POSTGRES_USER: agentsafety
+          POSTGRES_PASSWORD: integration-test-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U agentsafety -d agentsafety_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      ASL_TEST_POSTGRES_URL: postgresql+psycopg://agentsafety:integration-test-only@localhost:5432/agentsafety_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install -e ".[dev]"
+      - run: pytest tests/test_postgres.py
+
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Compose
+        env:
+          ASL_API_KEYS: ci-validation-key-not-for-production
+          POSTGRES_PASSWORD: ci-validation-password
+        run: docker compose config --quiet
+      - name: Build hardened image
+        run: docker build --tag agent-safety-lab:ci .

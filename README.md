@@ -78,6 +78,9 @@ operational-agent example.
 - authenticated FastAPI gateway with OpenAPI documentation
 - versioned prompt scanning and pre-execution action-authorization endpoints
 - request correlation, defensive response headers, and audit hashes
+- SQL-backed audit persistence with PostgreSQL write serialization
+- per-key rate limiting and privacy-safe JSON request logs
+- hardened non-root container and PostgreSQL Compose stack
 
 ## API gateway
 
@@ -153,9 +156,23 @@ it does not by itself prevent deletion, rollback, or replacement of the entire
 audit log. Production use will require signed checkpoints and durable external
 storage.
 
-The current audit chain is process-local and resets on restart. Multi-worker or
-production deployment must use a durable audit adapter before relying on audit
-continuity.
+SQLite is supported for local development. Production mode refuses to start
+without PostgreSQL. PostgreSQL writes use a transaction advisory lock so
+concurrent workers extend one hash chain. Schema migrations and signed external
+checkpoints are still required before stable release.
+
+## Container quick start
+
+```bash
+cp .env.example .env
+# Replace both secrets in .env, then:
+docker compose up --build
+```
+
+Compose binds the gateway to localhost, runs it as an unprivileged user with a
+read-only filesystem and dropped Linux capabilities, and waits for PostgreSQL
+health. Put TLS or managed ingress in front before wider exposure. The current
+rate limiter is process-local; horizontal scaling requires a shared backend.
 
 See [THREAT_MODEL.md](THREAT_MODEL.md), [ARCHITECTURE.md](ARCHITECTURE.md), and
 [ROADMAP.md](ROADMAP.md).

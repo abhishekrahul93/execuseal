@@ -1,0 +1,43 @@
+services:
+  gateway:
+    build: .
+    restart: unless-stopped
+    environment:
+      ASL_API_KEYS: ${ASL_API_KEYS:?Set ASL_API_KEYS to a strong random value}
+      ASL_POLICY_PATH: /app/policies/warehouse.yml
+      ASL_DATABASE_URL: postgresql+psycopg://agentsafety:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/agentsafety
+      ASL_ENVIRONMENT: production
+      ASL_RATE_LIMIT_REQUESTS: ${ASL_RATE_LIMIT_REQUESTS:-120}
+      ASL_RATE_LIMIT_WINDOW_SECONDS: ${ASL_RATE_LIMIT_WINDOW_SECONDS:-60}
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,noexec,nosuid
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: agentsafety
+      POSTGRES_USER: agentsafety
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentsafety -d agentsafety"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  postgres_data:

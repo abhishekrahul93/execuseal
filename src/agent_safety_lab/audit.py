@@ -30,8 +30,10 @@ class AuditRecord:
 class AuditChain:
     """Create verifiable records without storing prompts or tool parameters."""
 
-    def __init__(self) -> None:
-        self._records: list[AuditRecord] = []
+    def __init__(self, records: tuple[AuditRecord, ...] = ()) -> None:
+        self._records: list[AuditRecord] = list(records)
+        if not self.verify():
+            raise ValueError("initial audit records do not form a valid hash chain")
 
     @property
     def records(self) -> tuple[AuditRecord, ...]:

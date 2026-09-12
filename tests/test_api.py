@@ -9,9 +9,10 @@ API_KEY = "test-key-at-least-16-characters"
 
 
 @pytest.fixture
-def client() -> TestClient:
+def client(tmp_path: Path) -> TestClient:
     policy_path = Path(__file__).parents[1] / "policies" / "warehouse.yml"
-    app = create_app(GatewaySettings((API_KEY,), policy_path))
+    database_url = f"sqlite:///{tmp_path / 'audit.db'}"
+    app = create_app(GatewaySettings((API_KEY,), policy_path, database_url=database_url))
     return TestClient(app)
 
 
@@ -95,8 +96,8 @@ def test_inventory_update_requires_approval_and_creates_audit_record(
     assert body["policy_rule_id"] == "review-production-inventory-write"
     assert body["blast_radius"]["score"] == 50
     assert len(body["audit_hash"]) == 64
-    assert client.app.state.gateway.audit_chain.verify()
-    assert "count" not in repr(client.app.state.gateway.audit_chain.records[0])
+    assert client.app.state.gateway.audit_store.verify()
+    assert client.app.state.gateway.audit_store.count() == 1
 
 
 def test_customer_export_is_blocked(client: TestClient) -> None:
@@ -149,3 +150,61 @@ def test_settings_require_strong_unique_keys(tmp_path: Path) -> None:
         GatewaySettings(("short",), tmp_path / "policy.yml")
     with pytest.raises(ValueError, match="unique"):
         GatewaySettings((API_KEY, API_KEY), tmp_path / "policy.yml")
+
+
+def test_production_requires_postgresql(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="PostgreSQL"):
+        GatewaySettings(
+            (API_KEY,),
+            tmp_path / "policy.yml",
+            database_url="sqlite:///audit.db",
+            deployment_environment="production",
+        )
+
+
+def test_rate_limit_returns_429(tmp_path: Path) -> None:
+    policy_path = Path(__file__).parents[1] / "policies" / "warehouse.yml"
+    app = create_app(
+        GatewaySettings(
+            (API_KEY,),
+            policy_path,
+            database_url=f"sqlite:///{tmp_path / 'rate.db'}",
+            rate_limit_requests=1,
+        )
+    )
+    rate_client = TestClient(app)
+
+    first = rate_client.post("/v1/scan", headers=auth_headers(), json={"text": "Hi"})
+    assert first.status_code == 200
+    response = rate_client.post("/v1/scan", headers=auth_headers(), json={"text": "Hi"})
+
+    assert response.status_code == 429
+    assert response.headers["retry-after"] == "60"
+
+
+def test_audit_records_survive_application_restart(tmp_path: Path) -> None:
+    policy_path = Path(__file__).parents[1] / "policies" / "warehouse.yml"
+    database_url = f"sqlite:///{tmp_path / 'persistent.db'}"
+    settings = GatewaySettings((API_KEY,), policy_path, database_url=database_url)
+    payload = {
+        "context": {
+            "agent_id": "warehouse-copilot",
+            "principal_id": "operator-42",
+            "environment": "production",
+        },
+        "action": {
+            "tool": "inventory_db",
+            "operation": "read",
+            "resource": "stock_levels",
+        },
+    }
+
+    first_client = TestClient(create_app(settings))
+    assert first_client.post(
+        "/v1/actions/authorize", headers=auth_headers(), json=payload
+    ).status_code == 200
+    first_client.app.state.gateway.audit_store.close()
+
+    restarted_client = TestClient(create_app(settings))
+    assert restarted_client.app.state.gateway.audit_store.count() == 1
+    assert restarted_client.get("/readyz").status_code == 200

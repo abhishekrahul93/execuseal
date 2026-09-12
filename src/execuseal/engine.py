@@ -1,7 +1,7 @@
 """Safety decision orchestration."""
 
-from agent_safety_lab.detectors import PromptInjectionDetector
-from agent_safety_lab.models import Action, SafetyDecision
+from execuseal.detectors import PromptInjectionDetector
+from execuseal.models import Action, SafetyDecision
 
 
 class SafetyEngine:

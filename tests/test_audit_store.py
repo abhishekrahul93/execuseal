@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from agent_safety_lab import (
+from execuseal import (
     Action,
     ActionContext,
     ActionFirewall,
@@ -10,7 +10,7 @@ from agent_safety_lab import (
     PolicySet,
     ToolAction,
 )
-from agent_safety_lab.audit_store import SqlAuditStore, audit_events
+from execuseal.audit_store import SqlAuditStore, audit_events
 
 
 def test_detects_database_tampering(tmp_path: Path) -> None:

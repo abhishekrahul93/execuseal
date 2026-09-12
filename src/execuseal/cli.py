@@ -6,13 +6,13 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from agent_safety_lab.benchmark import BenchmarkFormatError, BenchmarkRunner
-from agent_safety_lab.config import PolicyConfigError, load_policy
-from agent_safety_lab.engine import SafetyEngine
+from execuseal.benchmark import BenchmarkFormatError, BenchmarkRunner
+from execuseal.config import PolicyConfigError, load_policy
+from execuseal.engine import SafetyEngine
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="agentsafety")
+    parser = argparse.ArgumentParser(prog="execuseal")
     subcommands = parser.add_subparsers(dest="command", required=True)
 
     scan = subcommands.add_parser("scan", help="Scan one prompt for baseline threats")

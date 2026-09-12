@@ -2,14 +2,14 @@
 
 from dataclasses import dataclass
 
-from agent_safety_lab.actions import (
+from execuseal.actions import (
     ActionContext,
     DataClassification,
     Environment,
     Impact,
     ToolAction,
 )
-from agent_safety_lab.models import Action
+from execuseal.models import Action
 
 
 @dataclass(frozen=True, slots=True)

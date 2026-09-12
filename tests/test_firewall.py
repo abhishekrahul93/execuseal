@@ -1,4 +1,4 @@
-from agent_safety_lab import (
+from execuseal import (
     Action,
     ActionContext,
     ActionFirewall,

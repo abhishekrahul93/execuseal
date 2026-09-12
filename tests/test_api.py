@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from agent_safety_lab.api import GatewaySettings, create_app
+from execuseal.api import GatewaySettings, create_app
 
 API_KEY = "test-key-at-least-16-characters"
 
@@ -140,7 +140,7 @@ def test_schema_rejects_unknown_fields(client: TestClient) -> None:
 def test_openapi_contract_documents_api_key_security(client: TestClient) -> None:
     contract = client.get("/openapi.json").json()
 
-    assert contract["info"]["title"] == "Agent Safety Lab Gateway"
+    assert contract["info"]["title"] == "ExecuSeal Gateway"
     assert "APIKeyHeader" in contract["components"]["securitySchemes"]
     assert contract["paths"]["/v1/actions/authorize"]["post"]["security"]
 

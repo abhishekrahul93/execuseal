@@ -9,8 +9,8 @@ import threading
 import time
 from dataclasses import asdict, dataclass
 
-from agent_safety_lab.actions import ActionContext, ToolAction
-from agent_safety_lab.models import Action
+from execuseal.actions import ActionContext, ToolAction
+from execuseal.models import Action
 
 
 class TokenError(ValueError):

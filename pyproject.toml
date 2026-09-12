@@ -3,7 +3,7 @@ requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"
 
 [project]
-name = "agent-safety-lab"
+name = "execuseal"
 version = "0.1.0a0"
 description = "Explainable safety checks and policy enforcement for AI agents"
 readme = "README.md"
@@ -28,7 +28,7 @@ dependencies = [
 ]
 
 [project.scripts]
-agentsafety = "agent_safety_lab.cli:main"
+execuseal = "execuseal.cli:main"
 
 [project.optional-dependencies]
 dev = [
@@ -41,10 +41,10 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/agent_safety_lab"]
+packages = ["src/execuseal"]
 
 [tool.pytest.ini_options]
-addopts = "--strict-markers --strict-config --cov=agent_safety_lab --cov-report=term-missing"
+addopts = "--strict-markers --strict-config --cov=execuseal --cov-report=term-missing"
 testpaths = ["tests"]
 
 [tool.ruff]
@@ -57,4 +57,4 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 [tool.mypy]
 python_version = "3.11"
 strict = true
-packages = ["agent_safety_lab"]
+packages = ["execuseal"]

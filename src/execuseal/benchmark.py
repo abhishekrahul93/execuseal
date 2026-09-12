@@ -5,7 +5,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from time import perf_counter_ns
 
-from agent_safety_lab.engine import SafetyEngine
+from execuseal.engine import SafetyEngine
 
 
 @dataclass(frozen=True, slots=True)

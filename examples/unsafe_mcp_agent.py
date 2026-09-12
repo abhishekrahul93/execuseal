@@ -3,7 +3,7 @@
 from collections.abc import Mapping
 from typing import Any
 
-from agent_safety_lab import (
+from execuseal import (
     Action,
     ActionContext,
     ActionFirewall,
@@ -15,8 +15,8 @@ from agent_safety_lab import (
     PolicyRule,
     PolicySet,
 )
-from agent_safety_lab.mcp import McpSafetyProxy, McpToolProfile
-from agent_safety_lab.tokens import AuthorizationSigner
+from execuseal.mcp import McpSafetyProxy, McpToolProfile
+from execuseal.tokens import AuthorizationSigner
 
 executed_calls: list[Mapping[str, Any]] = []
 

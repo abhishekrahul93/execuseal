@@ -6,15 +6,15 @@ from datetime import datetime
 from typing import Any, Protocol
 from uuid import uuid4
 
-from agent_safety_lab.actions import (
+from execuseal.actions import (
     ActionContext,
     DataClassification,
     Impact,
     ToolAction,
 )
-from agent_safety_lab.audit import AuditRecord
-from agent_safety_lab.firewall import ActionDecision, ActionFirewall
-from agent_safety_lab.tokens import AuthorizationSigner
+from execuseal.audit import AuditRecord
+from execuseal.firewall import ActionDecision, ActionFirewall
+from execuseal.tokens import AuthorizationSigner
 
 McpToolHandler = Callable[[Mapping[str, Any]], Mapping[str, Any]]
 MCP_PROTOCOL_VERSION = "2026-07-28"

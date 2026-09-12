@@ -14,7 +14,7 @@ Every line has exactly four fields:
 Run it with:
 
 ```bash
-agentsafety test benchmarks/v0.1.jsonl --minimum-score 80
+execuseal test benchmarks/v0.1.jsonl --minimum-score 80
 ```
 
 Results are calculated at runtime. Dataset changes require review because adding

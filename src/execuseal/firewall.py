@@ -2,10 +2,10 @@
 
 from dataclasses import dataclass
 
-from agent_safety_lab.actions import ActionContext, ToolAction
-from agent_safety_lab.blast_radius import BlastRadius, BlastRadiusAssessor
-from agent_safety_lab.models import Action
-from agent_safety_lab.policy import PolicyEngine
+from execuseal.actions import ActionContext, ToolAction
+from execuseal.blast_radius import BlastRadius, BlastRadiusAssessor
+from execuseal.models import Action
+from execuseal.policy import PolicyEngine
 
 
 @dataclass(frozen=True, slots=True)

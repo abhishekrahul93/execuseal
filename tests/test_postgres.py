@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-from agent_safety_lab import (
+from execuseal import (
     Action,
     ActionContext,
     ActionFirewall,
@@ -12,9 +12,9 @@ from agent_safety_lab import (
     PolicySet,
     ToolAction,
 )
-from agent_safety_lab.audit_store import SqlAuditStore
+from execuseal.audit_store import SqlAuditStore
 
-POSTGRES_URL = os.getenv("ASL_TEST_POSTGRES_URL")
+POSTGRES_URL = os.getenv("EXECUSEAL_TEST_POSTGRES_URL")
 
 
 @pytest.mark.skipif(not POSTGRES_URL, reason="PostgreSQL integration URL not configured")

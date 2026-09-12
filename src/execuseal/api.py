@@ -17,20 +17,20 @@ from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.middleware.base import RequestResponseEndpoint
 
-from agent_safety_lab.actions import (
+from execuseal.actions import (
     ActionContext,
     DataClassification,
     Environment,
     Impact,
     ToolAction,
 )
-from agent_safety_lab.audit_store import SqlAuditStore
-from agent_safety_lab.config import load_policy
-from agent_safety_lab.engine import SafetyEngine
-from agent_safety_lab.firewall import ActionFirewall
-from agent_safety_lab.policy import PolicyEngine
-from agent_safety_lab.rate_limit import RateLimiter
-from agent_safety_lab.tokens import AuthorizationSigner
+from execuseal.audit_store import SqlAuditStore
+from execuseal.config import load_policy
+from execuseal.engine import SafetyEngine
+from execuseal.firewall import ActionFirewall
+from execuseal.policy import PolicyEngine
+from execuseal.rate_limit import RateLimiter
+from execuseal.tokens import AuthorizationSigner
 
 API_VERSION = "v1"
 PACKAGE_VERSION = "0.1.0a0"
@@ -45,7 +45,7 @@ class GatewaySettings:
     api_keys: tuple[str, ...]
     policy_path: Path
     cors_origins: tuple[str, ...] = ()
-    database_url: str = "sqlite:///agent_safety_lab.db"
+    database_url: str = "sqlite:///execuseal.db"
     rate_limit_requests: int = 120
     rate_limit_window_seconds: int = 60
     deployment_environment: str = "development"
@@ -70,23 +70,27 @@ class GatewaySettings:
 
     @classmethod
     def from_environment(cls) -> "GatewaySettings":
-        keys = tuple(key.strip() for key in os.getenv("ASL_API_KEYS", "").split(",") if key.strip())
-        policy_path = Path(os.getenv("ASL_POLICY_PATH", "policies/warehouse.yml"))
+        keys = tuple(
+            key.strip()
+            for key in os.getenv("EXECUSEAL_API_KEYS", "").split(",")
+            if key.strip()
+        )
+        policy_path = Path(os.getenv("EXECUSEAL_POLICY_PATH", "policies/warehouse.yml"))
         origins = tuple(
             origin.strip()
-            for origin in os.getenv("ASL_CORS_ORIGINS", "").split(",")
+            for origin in os.getenv("EXECUSEAL_CORS_ORIGINS", "").split(",")
             if origin.strip()
         )
         return cls(
             keys,
             policy_path,
             origins,
-            os.getenv("ASL_DATABASE_URL", "sqlite:///agent_safety_lab.db"),
-            int(os.getenv("ASL_RATE_LIMIT_REQUESTS", "120")),
-            int(os.getenv("ASL_RATE_LIMIT_WINDOW_SECONDS", "60")),
-            os.getenv("ASL_ENVIRONMENT", "development"),
-            os.getenv("ASL_SIGNING_SECRET", ""),
-            int(os.getenv("ASL_TOKEN_TTL_SECONDS", "30")),
+            os.getenv("EXECUSEAL_DATABASE_URL", "sqlite:///execuseal.db"),
+            int(os.getenv("EXECUSEAL_RATE_LIMIT_REQUESTS", "120")),
+            int(os.getenv("EXECUSEAL_RATE_LIMIT_WINDOW_SECONDS", "60")),
+            os.getenv("EXECUSEAL_ENVIRONMENT", "development"),
+            os.getenv("EXECUSEAL_SIGNING_SECRET", ""),
+            int(os.getenv("EXECUSEAL_TOKEN_TTL_SECONDS", "30")),
         )
 
 
@@ -193,7 +197,7 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
         ),
     )
     app = FastAPI(
-        title="Agent Safety Lab Gateway",
+        title="ExecuSeal Gateway",
         description="Pre-execution policy firewall for AI-agent prompts and tool actions.",
         version=PACKAGE_VERSION,
         docs_url="/docs",
@@ -224,7 +228,7 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
         response.headers["X-Request-ID"] = request_id
         response.headers["Cache-Control"] = "no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
-        logging.getLogger("agent_safety_lab.request").info(
+        logging.getLogger("execuseal.request").info(
             json.dumps(
                 {
                     "event": "http_request",

@@ -7,7 +7,7 @@ of protection. Later detectors can implement the same interface.
 import re
 from dataclasses import dataclass
 
-from agent_safety_lab.models import Finding
+from execuseal.models import Finding
 
 
 @dataclass(frozen=True, slots=True)

@@ -5,9 +5,9 @@ from datetime import datetime
 from sqlalchemy import Column, Integer, MetaData, String, Table, create_engine, select, text
 from sqlalchemy.engine import Connection, Engine
 
-from agent_safety_lab.actions import ActionContext, ToolAction
-from agent_safety_lab.audit import AuditChain, AuditRecord
-from agent_safety_lab.firewall import ActionDecision
+from execuseal.actions import ActionContext, ToolAction
+from execuseal.audit import AuditChain, AuditRecord
+from execuseal.firewall import ActionDecision
 
 metadata = MetaData()
 audit_events = Table(

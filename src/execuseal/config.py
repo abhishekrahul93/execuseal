@@ -6,9 +6,9 @@ from typing import Any
 
 import yaml
 
-from agent_safety_lab.actions import DataClassification, Environment, Impact
-from agent_safety_lab.models import Action
-from agent_safety_lab.policy import PolicyRule, PolicySet
+from execuseal.actions import DataClassification, Environment, Impact
+from execuseal.models import Action
+from execuseal.policy import PolicyRule, PolicySet
 
 POLICY_KEYS = frozenset({"version", "default_action", "rules"})
 RULE_KEYS = frozenset(

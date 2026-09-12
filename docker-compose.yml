@@ -3,14 +3,14 @@ services:
     build: .
     restart: unless-stopped
     environment:
-      ASL_API_KEYS: ${ASL_API_KEYS:?Set ASL_API_KEYS to a strong random value}
-      ASL_POLICY_PATH: /app/policies/warehouse.yml
-      ASL_DATABASE_URL: postgresql+psycopg://agentsafety:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/agentsafety
-      ASL_ENVIRONMENT: production
-      ASL_RATE_LIMIT_REQUESTS: ${ASL_RATE_LIMIT_REQUESTS:-120}
-      ASL_RATE_LIMIT_WINDOW_SECONDS: ${ASL_RATE_LIMIT_WINDOW_SECONDS:-60}
-      ASL_SIGNING_SECRET: ${ASL_SIGNING_SECRET:?Set ASL_SIGNING_SECRET to a strong random value}
-      ASL_TOKEN_TTL_SECONDS: ${ASL_TOKEN_TTL_SECONDS:-30}
+      EXECUSEAL_API_KEYS: ${EXECUSEAL_API_KEYS:?Set EXECUSEAL_API_KEYS to a strong random value}
+      EXECUSEAL_POLICY_PATH: /app/policies/warehouse.yml
+      EXECUSEAL_DATABASE_URL: postgresql+psycopg://execuseal:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/execuseal
+      EXECUSEAL_ENVIRONMENT: production
+      EXECUSEAL_RATE_LIMIT_REQUESTS: ${EXECUSEAL_RATE_LIMIT_REQUESTS:-120}
+      EXECUSEAL_RATE_LIMIT_WINDOW_SECONDS: ${EXECUSEAL_RATE_LIMIT_WINDOW_SECONDS:-60}
+      EXECUSEAL_SIGNING_SECRET: ${EXECUSEAL_SIGNING_SECRET:?Set EXECUSEAL_SIGNING_SECRET to a strong random value}
+      EXECUSEAL_TOKEN_TTL_SECONDS: ${EXECUSEAL_TOKEN_TTL_SECONDS:-30}
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
@@ -28,13 +28,13 @@ services:
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: agentsafety
-      POSTGRES_USER: agentsafety
+      POSTGRES_DB: execuseal
+      POSTGRES_USER: execuseal
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U agentsafety -d agentsafety"]
+      test: ["CMD-SHELL", "pg_isready -U execuseal -d execuseal"]
       interval: 5s
       timeout: 3s
       retries: 10

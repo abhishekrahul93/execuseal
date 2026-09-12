@@ -1,7 +1,7 @@
 import pytest
 
-from agent_safety_lab import Action, ActionContext, Environment, ToolAction
-from agent_safety_lab.tokens import AuthorizationSigner, TokenError
+from execuseal import Action, ActionContext, Environment, ToolAction
+from execuseal.tokens import AuthorizationSigner, TokenError
 
 SECRET = "test-signing-secret-with-more-than-32-bytes"
 

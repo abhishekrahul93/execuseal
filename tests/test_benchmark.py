@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from agent_safety_lab import BenchmarkRunner
-from agent_safety_lab.benchmark import BenchmarkFormatError, load_cases
+from execuseal import BenchmarkRunner
+from execuseal.benchmark import BenchmarkFormatError, load_cases
 
 
 def write_cases(path: Path, cases: list[dict[str, object]]) -> None:

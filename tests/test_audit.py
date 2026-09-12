@@ -1,7 +1,7 @@
 from dataclasses import replace
 from datetime import UTC, datetime
 
-from agent_safety_lab import (
+from execuseal import (
     Action,
     ActionContext,
     ActionFirewall,

@@ -1,6 +1,6 @@
 """Minimal operational example: authorize an inventory action before execution."""
 
-from agent_safety_lab import (
+from execuseal import (
     Action,
     ActionContext,
     ActionFirewall,

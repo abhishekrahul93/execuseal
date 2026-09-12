@@ -6,8 +6,8 @@ from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 
-from agent_safety_lab.actions import ActionContext, ToolAction
-from agent_safety_lab.firewall import ActionDecision
+from execuseal.actions import ActionContext, ToolAction
+from execuseal.firewall import ActionDecision
 
 
 @dataclass(frozen=True, slots=True)

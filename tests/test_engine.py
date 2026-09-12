@@ -1,6 +1,6 @@
 import pytest
 
-from agent_safety_lab import Action, SafetyEngine
+from execuseal import Action, SafetyEngine
 
 
 @pytest.mark.parametrize(

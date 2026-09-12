@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from agent_safety_lab.cli import main
+from execuseal.cli import main
 
 
 def test_scan_returns_nonzero_for_threat(capsys: object) -> None:

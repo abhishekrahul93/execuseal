@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from agent_safety_lab import Action, PolicyConfigError, load_policy, parse_policy
+from execuseal import Action, PolicyConfigError, load_policy, parse_policy
 
 
 def valid_policy() -> dict[str, object]:

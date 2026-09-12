@@ -1,6 +1,6 @@
 import pytest
 
-from agent_safety_lab.rate_limit import RateLimiter
+from execuseal.rate_limit import RateLimiter
 
 
 def test_window_resets_after_interval() -> None:

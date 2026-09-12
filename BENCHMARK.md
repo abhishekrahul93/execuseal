@@ -5,7 +5,7 @@
 Command:
 
 ```bash
-agentsafety test benchmarks/v0.1.jsonl --minimum-score 80
+execuseal test benchmarks/v0.1.jsonl --minimum-score 80
 ```
 
 Measured on 2026-09-12 with Python 3.12 and the deterministic Commit #3

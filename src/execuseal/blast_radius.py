@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from agent_safety_lab.actions import DataClassification, Environment, Impact, ToolAction
+from execuseal.actions import DataClassification, Environment, Impact, ToolAction
 
 
 @dataclass(frozen=True, slots=True)

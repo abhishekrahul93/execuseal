@@ -30,7 +30,7 @@ detector configuration, approval decisions, and audit storage.
 | T3 | Data exfiltration | Baseline pattern detection |
 | T4 | Destructive action | Baseline pattern detection |
 | T5 | Indirect prompt injection | Planned |
-| T6 | Tool privilege escalation | Planned |
+| T6 | Tool privilege escalation | Default-deny action policy baseline |
 | T7 | Memory poisoning | Planned |
 | T8 | Cross-agent injection | Planned |
 
@@ -46,3 +46,9 @@ detector configuration, approval decisions, and audit storage.
 Pattern rules can be bypassed through paraphrasing, encoding, other languages,
 or multi-step attacks. They can also produce false positives. The baseline is a
 transparent enforcement signal and test harness, not a complete defense.
+
+Policy enforcement depends on truthful context and action metadata supplied by
+the host application. Hash chaining detects record modification but cannot by
+itself detect removal or replacement of the entire audit chain. Sandboxing,
+strong identity, least-privilege credentials, durable logs, and human approval
+remain necessary controls.

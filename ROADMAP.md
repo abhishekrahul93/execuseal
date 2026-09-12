@@ -5,16 +5,20 @@
 - [x] Typed decision model and deterministic baseline detector
 - [x] Initial threat model and architecture decision
 - [x] Automated tests and Apache-2.0 licensing
-- [ ] Configurable policy engine
+- [x] Default-deny action policy engine
+- [x] Blast-radius assessment and human-approval decisions
+- [x] Privacy-aware, hash-chained audit evidence
 - [ ] Structured attack fixtures and baseline metrics
 - [ ] FastAPI gateway and OpenAPI contract
 - [ ] CLI with machine-readable output and CI exit codes
 
 ## v0.2 — agent action security
 
-- tool-call schema and permission checks
+- external YAML/JSON policy loading and schema validation
+- resource patterns, principal scopes, quotas, and time constraints
 - secrets and PII detectors with redaction
-- approval workflow and tamper-evident audit events
+- signed audit checkpoints and durable storage adapter
+- approval workflow with expiry and separation of duties
 - indirect prompt-injection benchmark
 
 ## v0.3 — integrations and evaluation

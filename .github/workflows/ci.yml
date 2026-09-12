@@ -28,3 +28,5 @@ jobs:
         run: mypy
       - name: Test
         run: pytest
+      - name: Safety benchmark gate
+        run: agentsafety test benchmarks/v0.1.jsonl --minimum-score 80

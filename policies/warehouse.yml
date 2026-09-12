@@ -1,0 +1,32 @@
+version: 1
+default_action: block
+
+# First match wins. Keep narrow deny/review rules before broader allow rules.
+rules:
+  - id: block-customer-export
+    effect: block
+    tools: [inventory_db]
+    operations: [export]
+    resources: [customer_records]
+    environments: [development, staging, production]
+    maximum_data_classification: restricted
+    maximum_impact: system_wide
+    allow_external_destination: true
+
+  - id: review-production-inventory-write
+    effect: review
+    tools: [inventory_db]
+    operations: [update]
+    resources: [stock_levels]
+    environments: [production]
+    maximum_data_classification: internal
+    maximum_impact: multiple_records
+
+  - id: allow-stock-read
+    effect: allow
+    tools: [inventory_db]
+    operations: [read]
+    resources: [stock_levels]
+    environments: [development, staging, production]
+    maximum_data_classification: internal
+    maximum_impact: none

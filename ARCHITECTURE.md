@@ -50,3 +50,17 @@ durable storage to detect truncation or total replacement.
 - `benchmarks`: versioned adversarial cases and metrics
 - `cli`: local scans and CI/CD safety gates
 - `audit`: privacy-aware event records
+
+## Decision ADR-004: versioned strict configuration
+
+Policies are JSON or YAML documents with an explicit schema version. Loading
+uses safe YAML parsing, rejects unknown fields, validates enum values, and fails
+before runtime enforcement begins. Versioning creates a migration path without
+silently changing policy meaning.
+
+## Decision ADR-005: reproducible safety gates
+
+Benchmarks use reviewable JSON Lines fixtures and calculate precision, recall,
+F1, false-positive rate, and mean detector latency at runtime. CI gates on F1
+because accuracy can hide failures in an imbalanced dataset. Benchmark results
+must always name the dataset version and may not be generalized beyond it.

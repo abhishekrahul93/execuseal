@@ -8,13 +8,13 @@
 - [x] Default-deny action policy engine
 - [x] Blast-radius assessment and human-approval decisions
 - [x] Privacy-aware, hash-chained audit evidence
-- [ ] Structured attack fixtures and baseline metrics
+- [x] Validated YAML/JSON policy-as-code
+- [x] Structured attack fixtures and baseline metrics
+- [x] CLI with machine-readable output and CI exit codes
 - [ ] FastAPI gateway and OpenAPI contract
-- [ ] CLI with machine-readable output and CI exit codes
 
 ## v0.2 — agent action security
 
-- external YAML/JSON policy loading and schema validation
 - resource patterns, principal scopes, quotas, and time constraints
 - secrets and PII detectors with redaction
 - signed audit checkpoints and durable storage adapter

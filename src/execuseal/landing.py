@@ -268,7 +268,7 @@ _LANDING_PAGE = """<!doctype html>
         <span class="mark" aria-hidden="true">E</span><span class="brand-name">ExecuSeal</span>
       </a>
       <div class="links">
-        <a href="#benefits">Benefits</a><a href="/docs">Developers</a>
+        <a href="/playground">Try demo</a><a href="#benefits">Benefits</a><a href="/docs">Developers</a>
         <a href="https://github.com/abhishekrahul93/execuseal">GitHub ↗</a>
       </div>
     </nav>
@@ -281,8 +281,8 @@ _LANDING_PAGE = """<!doctype html>
         <h1><span>Give agents tools.</span><span class="accent-line">Keep control.</span></h1>
         <p class="lede">Inspect what an AI agent wants to do before it touches your systems. Allow routine work, pause sensitive changes, and block actions outside policy.</p>
         <div class="actions">
-          <a class="button" href="/docs">Explore the API</a>
-          <a class="button secondary" href="https://github.com/abhishekrahul93/execuseal#quick-start">Start a local pilot</a>
+          <a class="button" href="/playground">Try the live sandbox</a>
+          <a class="button secondary" href="/docs">Explore the API</a>
         </div>
         <p class="meta"><span>Pre-alpha</span><span>Apache-2.0</span><span>Model independent</span></p>
       </div>

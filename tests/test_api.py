@@ -57,6 +57,52 @@ def test_home_is_public_product_page_with_security_headers(client: TestClient) -
     assert response.headers["x-frame-options"] == "DENY"
 
 
+def test_public_playground_is_safe_and_requires_no_credentials(client: TestClient) -> None:
+    page = client.get("/playground")
+    script = client.get("/assets/playground.js")
+
+    assert page.status_code == 200
+    assert "Fixed fake data" in page.text
+    assert 'script-src \'self\'' in page.headers["content-security-policy"]
+    assert script.status_code == 200
+    assert script.headers["content-type"].startswith("application/javascript")
+
+
+@pytest.mark.parametrize(
+    ("scenario_id", "expected_action", "expected_score"),
+    [
+        ("inventory_read", "allow", 0),
+        ("inventory_update", "review", 50),
+        ("customer_export", "block", 100),
+    ],
+)
+def test_public_demo_evaluates_only_fixed_synthetic_actions(
+    client: TestClient,
+    scenario_id: str,
+    expected_action: str,
+    expected_score: int,
+) -> None:
+    audits_before = client.app.state.gateway.audit_store.count()
+    response = client.post("/v1/demo/authorize", json={"scenario_id": scenario_id})
+
+    assert response.status_code == 200
+    assert response.json()["action"] == expected_action
+    assert response.json()["blast_radius"]["score"] == expected_score
+    assert response.json()["synthetic"] is True
+    assert response.json()["execution_performed"] is False
+    assert "authorization_token" not in response.json()
+    assert client.app.state.gateway.audit_store.count() == audits_before
+
+
+def test_public_demo_rejects_arbitrary_action_input(client: TestClient) -> None:
+    response = client.post(
+        "/v1/demo/authorize",
+        json={"scenario_id": "arbitrary", "tool": "shell", "operation": "execute"},
+    )
+
+    assert response.status_code == 422
+
+
 def test_metrics_are_protected_and_export_low_cardinality_series(
     client: TestClient,
 ) -> None:

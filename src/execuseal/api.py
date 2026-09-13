@@ -40,6 +40,7 @@ from execuseal.landing import landing_page
 from execuseal.migrations import require_current, upgrade
 from execuseal.models import Action
 from execuseal.observability import GatewayMetrics
+from execuseal.playground import playground_page, playground_script
 from execuseal.policy import PolicyEngine
 from execuseal.rate_limit import SqlRateLimiter
 from execuseal.tokens import AuthorizationSigner, SqlReplayGuard, action_digest
@@ -273,6 +274,23 @@ class VerificationKeysResponse(StrictModel):
     keys: dict[str, str]
 
 
+class DemoScenarioRequest(StrictModel):
+    scenario_id: Literal["inventory_read", "inventory_update", "customer_export"]
+
+
+class DemoDecisionResponse(StrictModel):
+    request_id: str
+    scenario_id: str
+    action: str
+    would_allow: bool
+    approval_required: bool
+    policy_rule_id: str | None
+    reason: str
+    blast_radius: BlastRadiusResponse
+    synthetic: bool = True
+    execution_performed: bool = False
+
+
 class IdentityCreateRequest(StrictModel):
     principal_id: str = Field(min_length=1, max_length=128)
     scopes: set[Literal["scan", "authorize", "admin"]] = Field(min_length=1)
@@ -449,6 +467,14 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
     def home() -> Response:
         return landing_page()
 
+    @app.get("/playground", include_in_schema=False)
+    def playground() -> Response:
+        return playground_page()
+
+    @app.get("/assets/playground.js", include_in_schema=False)
+    def playground_javascript() -> Response:
+        return playground_script()
+
     def require_reviewer_key(key: str | None = Security(reviewer_key_header)) -> str:
         valid_key = key is not None and any(
             hmac.compare_digest(key, valid) for valid in active_settings.reviewer_api_keys
@@ -541,6 +567,46 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
                 for finding in decision.findings
             ],
             redacted_text=decision.redacted_text,
+        )
+
+    @app.post(
+        "/v1/demo/authorize",
+        response_model=DemoDecisionResponse,
+        tags=["demo"],
+        summary="Evaluate a fixed synthetic agent action",
+    )
+    def demo_authorize(
+        payload: DemoScenarioRequest,
+        request: Request,
+        response: Response,
+    ) -> DemoDecisionResponse:
+        client_host = request.client.host if request.client is not None else "unknown"
+        allowed, remaining, retry_after = gateway.rate_limiter.allow(
+            f"public-demo:{client_host}"
+        )
+        if not allowed:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Public demo rate limit exceeded",
+                headers={"Retry-After": str(retry_after)},
+            )
+        response.headers["X-RateLimit-Remaining"] = str(remaining)
+        context, action = _demo_action(payload.scenario_id)
+        decision = gateway.action_firewall.authorize(action, context)
+        gateway.metrics.decisions.labels("demo_action", decision.action.value).inc()
+        return DemoDecisionResponse(
+            request_id=request.state.request_id,
+            scenario_id=payload.scenario_id,
+            action=decision.action.value,
+            would_allow=decision.execution_allowed,
+            approval_required=decision.approval_required,
+            policy_rule_id=decision.policy_rule_id,
+            reason=decision.reason,
+            blast_radius=BlastRadiusResponse(
+                score=decision.blast_radius.score,
+                level=decision.blast_radius.level,
+                reasons=list(decision.blast_radius.reasons),
+            ),
         )
 
     @app.post(
@@ -697,6 +763,28 @@ def _domain_action(
             action.parameters,
         ),
     )
+
+
+def _demo_action(scenario_id: str) -> tuple[ActionContext, ToolAction]:
+    context = ActionContext("demo-agent", "synthetic-user", Environment.PRODUCTION)
+    scenarios = {
+        "inventory_read": ToolAction("inventory_db", "read", "stock_levels"),
+        "inventory_update": ToolAction(
+            "inventory_db",
+            "update",
+            "stock_levels",
+            impact=Impact.MULTIPLE_RECORDS,
+        ),
+        "customer_export": ToolAction(
+            "inventory_db",
+            "export",
+            "customer_records",
+            data_classification=DataClassification.RESTRICTED,
+            impact=Impact.MULTIPLE_RECORDS,
+            external_destination=True,
+        ),
+    }
+    return context, scenarios[scenario_id]
 
 
 def _approval_response(

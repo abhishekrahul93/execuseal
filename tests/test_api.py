@@ -46,6 +46,17 @@ def test_health_is_public_and_disables_caching(client: TestClient) -> None:
     assert response.headers["x-content-type-options"] == "nosniff"
 
 
+def test_home_is_public_product_page_with_security_headers(client: TestClient) -> None:
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert "Give agents tools" in response.text
+    assert 'href="/docs"' in response.text
+    assert response.headers["content-type"].startswith("text/html")
+    assert response.headers["content-security-policy"].startswith("default-src 'none'")
+    assert response.headers["x-frame-options"] == "DENY"
+
+
 def test_metrics_are_protected_and_export_low_cardinality_series(
     client: TestClient,
 ) -> None:

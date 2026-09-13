@@ -36,6 +36,7 @@ from execuseal.config import load_policy
 from execuseal.engine import SafetyEngine
 from execuseal.firewall import ActionFirewall
 from execuseal.identities import ServiceIdentity, SqlIdentityStore
+from execuseal.landing import landing_page
 from execuseal.migrations import require_current, upgrade
 from execuseal.models import Action
 from execuseal.observability import GatewayMetrics
@@ -443,6 +444,10 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
     require_scan_key = require_scope("scan")
     require_authorize_key = require_scope("authorize")
     require_admin_key = require_scope("admin")
+
+    @app.get("/", include_in_schema=False)
+    def home() -> Response:
+        return landing_page()
 
     def require_reviewer_key(key: str | None = Security(reviewer_key_header)) -> str:
         valid_key = key is not None and any(

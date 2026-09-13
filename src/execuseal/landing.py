@@ -37,14 +37,14 @@ _LANDING_PAGE = """<!doctype html>
       --ink: #071722;
       --muted: #4b6070;
       --line: #d9e2e7;
-      --paper: #f7faf8;
+      --paper: #f3f7f5;
       --white: #ffffff;
       --lime: #b7f34a;
       --lime-deep: #437b19;
       --amber: #ffca68;
       --rose: #ff8d93;
       --navy-2: #102b3c;
-      --max: 1180px;
+      --max: 1320px;
     }
     * { box-sizing: border-box; }
     html { scroll-behavior: smooth; }
@@ -83,11 +83,28 @@ _LANDING_PAGE = """<!doctype html>
     .links a { font-weight: 650; text-decoration: none; }
     .links a:hover { text-decoration: underline; text-underline-offset: 5px; }
     .hero {
+      position: relative;
       display: grid;
-      grid-template-columns: minmax(0, 1.05fr) minmax(360px, .95fr);
+      grid-template-columns: minmax(0, 1.08fr) minmax(420px, .92fr);
       align-items: center;
-      gap: clamp(44px, 7vw, 92px);
-      padding-block: clamp(72px, 10vw, 132px);
+      gap: clamp(48px, 6vw, 88px);
+      padding-block: clamp(64px, 8vw, 104px);
+      isolation: isolate;
+    }
+    .hero::before {
+      position: absolute;
+      z-index: -1;
+      inset: 22px -34px;
+      border: 1px solid #dce7e0;
+      border-radius: 32px;
+      background:
+        linear-gradient(rgba(7, 23, 34, .035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(7, 23, 34, .035) 1px, transparent 1px),
+        radial-gradient(circle at 18% 20%, rgba(183, 243, 74, .24), transparent 29%),
+        radial-gradient(circle at 82% 76%, rgba(59, 177, 194, .16), transparent 25%),
+        rgba(255, 255, 255, .78);
+      background-size: 32px 32px, 32px 32px, auto, auto, auto;
+      box-shadow: 0 24px 70px rgba(7, 23, 34, .07);
     }
     .eyebrow {
       margin: 0 0 22px;
@@ -99,11 +116,31 @@ _LANDING_PAGE = """<!doctype html>
     h1 {
       max-width: 780px;
       margin: 0;
-      font-size: clamp(3.15rem, 7vw, 6.25rem);
-      line-height: .94;
-      letter-spacing: -.065em;
+      font-size: clamp(3.1rem, 5vw, 4.8rem);
+      line-height: .98;
+      letter-spacing: -.055em;
     }
-    h1 span { color: var(--lime-deep); }
+    h1 span { display: block; }
+    h1 .accent-line {
+      position: relative;
+      isolation: isolate;
+      width: max-content;
+      max-width: 100%;
+      margin-top: 10px;
+      color: var(--lime-deep);
+    }
+    h1 .accent-line::after {
+      position: absolute;
+      z-index: -1;
+      right: -10px;
+      bottom: 3px;
+      left: -8px;
+      height: 15px;
+      border-radius: 999px;
+      background: rgba(183, 243, 74, .38);
+      content: "";
+      transform: rotate(-1deg);
+    }
     .lede { max-width: 650px; margin: 30px 0 0; color: var(--muted); font-size: 1.22rem; }
     .actions { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 34px; }
     .button {
@@ -122,16 +159,36 @@ _LANDING_PAGE = """<!doctype html>
     .button:hover { background: var(--navy-2); }
     .button.secondary { background: transparent; color: var(--ink); }
     .button.secondary:hover { background: #e9f0ec; }
-    .meta { margin-top: 22px; color: var(--muted); font-size: .9rem; }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 24px;
+      color: var(--muted);
+      font-size: .82rem;
+      font-weight: 720;
+    }
+    .meta span {
+      padding: 6px 10px;
+      border: 1px solid #cfddd4;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .72);
+    }
     .checkpoint {
       position: relative;
       overflow: hidden;
-      border: 1px solid #264255;
-      border-radius: 18px;
-      background: var(--ink);
+      border: 1px solid #284a5f;
+      border-radius: 20px;
+      background: linear-gradient(150deg, #071722, #0c2637);
       color: var(--white);
-      box-shadow: 18px 18px 0 #e5eddf;
-      transform: rotate(-1deg);
+      box-shadow: 0 30px 70px rgba(7, 23, 34, .22), 12px 12px 0 rgba(183, 243, 74, .16);
+    }
+    .checkpoint::before {
+      display: block;
+      width: 100%;
+      height: 4px;
+      background: linear-gradient(90deg, var(--lime), #59d6dc 55%, transparent);
+      content: "";
     }
     .checkpoint-head, .checkpoint-foot {
       display: flex;
@@ -185,7 +242,8 @@ _LANDING_PAGE = """<!doctype html>
       .links a:not(:last-child) { display: none; }
       .hero, .section-head, .quickstart { grid-template-columns: 1fr; }
       .hero { padding-top: 58px; }
-      .checkpoint { transform: none; box-shadow: 10px 10px 0 #e5eddf; }
+      .hero::before { inset: 12px -16px; border-radius: 24px; }
+      .checkpoint { box-shadow: 8px 8px 0 rgba(183, 243, 74, .16); }
       .grid { grid-template-columns: 1fr; }
       .flow { grid-template-columns: 1fr 1fr; }
       .section-head { gap: 20px; }
@@ -194,6 +252,7 @@ _LANDING_PAGE = """<!doctype html>
       .wrap { width: min(calc(100% - 28px), var(--max)); }
       .nav { min-height: 66px; }
       h1 { font-size: clamp(2.9rem, 15vw, 4.2rem); }
+      h1 .accent-line { width: auto; }
       .lede { font-size: 1.05rem; }
       .actions, .actions .button { width: 100%; }
       .flow { grid-template-columns: 1fr; }
@@ -219,13 +278,13 @@ _LANDING_PAGE = """<!doctype html>
     <div class="wrap hero">
       <div>
         <p class="eyebrow">Open source · agent action security</p>
-        <h1>Give agents tools. <span>Keep control.</span></h1>
+        <h1><span>Give agents tools.</span><span class="accent-line">Keep control.</span></h1>
         <p class="lede">Inspect what an AI agent wants to do before it touches your systems. Allow routine work, pause sensitive changes, and block actions outside policy.</p>
         <div class="actions">
           <a class="button" href="/docs">Explore the API</a>
           <a class="button secondary" href="https://github.com/abhishekrahul93/execuseal#quick-start">Start a local pilot</a>
         </div>
-        <p class="meta">Pre-alpha · Apache-2.0 · Model independent</p>
+        <p class="meta"><span>Pre-alpha</span><span>Apache-2.0</span><span>Model independent</span></p>
       </div>
       <div class="checkpoint" aria-label="Example ExecuSeal policy decisions">
         <div class="checkpoint-head"><span>Execution checkpoint</span><span class="sim">Simulation</span></div>

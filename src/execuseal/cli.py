@@ -9,12 +9,16 @@ from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
+from execuseal.actions import ActionContext, Environment, Impact, ToolAction
 from execuseal.audit_store import SqlAuditStore
 from execuseal.benchmark import BenchmarkFormatError, BenchmarkRunner
 from execuseal.checkpoints import AuditCheckpoint, create_checkpoint, verify_checkpoint
 from execuseal.config import PolicyConfigError, load_policy
 from execuseal.engine import SafetyEngine
+from execuseal.firewall import ActionFirewall
 from execuseal.migrations import upgrade
+from execuseal.models import Action
+from execuseal.policy import PolicyEngine, PolicyRule, PolicySet
 from execuseal.tokens import public_keys_from_base64
 
 
@@ -27,6 +31,8 @@ def build_parser() -> argparse.ArgumentParser:
     source.add_argument("--text", help="Text to scan")
     source.add_argument("--file", type=Path, help="UTF-8 text file to scan")
     scan.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
+
+    subcommands.add_parser("demo", help="Run safe synthetic client-value scenarios")
 
     test = subcommands.add_parser("test", help="Run a versioned safety benchmark")
     test.add_argument("dataset", type=Path, help="JSONL benchmark dataset")
@@ -62,6 +68,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if args.command == "scan":
             return _scan(args)
+        if args.command == "demo":
+            return _demo()
         if args.command == "test":
             return _test(args)
         if args.command == "db":
@@ -91,6 +99,7 @@ def _scan(args: argparse.Namespace) -> int:
             }
             for finding in decision.findings
         ],
+        "redacted_text": decision.redacted_text,
     }
     if args.json:
         print(json.dumps(payload, sort_keys=True))
@@ -98,7 +107,62 @@ def _scan(args: argparse.Namespace) -> int:
         print(f"Action: {decision.action.value.upper()}  Risk: {decision.risk_score}/100")
         for finding in decision.findings:
             print(f"- {finding.rule_id}: {finding.description}")
+        if decision.redacted_text is not None:
+            print(f"Redacted: {decision.redacted_text}")
     return 0 if decision.safe else 1
+
+
+def _demo() -> int:
+    """Show allow, review, block, and redaction without external services."""
+    policy = PolicySet(
+        (
+            PolicyRule(
+                "allow-stock-read",
+                Action.ALLOW,
+                tools=frozenset({"inventory_db"}),
+                operations=frozenset({"read"}),
+                resources=frozenset({"stock_levels"}),
+            ),
+            PolicyRule(
+                "review-stock-update",
+                Action.REVIEW,
+                tools=frozenset({"inventory_db"}),
+                operations=frozenset({"update"}),
+                resources=frozenset({"stock_levels"}),
+            ),
+        )
+    )
+    firewall = ActionFirewall(PolicyEngine(policy))
+    context = ActionContext("demo-agent", "demo-user", Environment.PRODUCTION)
+    actions = (
+        ("Read stock", ToolAction("inventory_db", "read", "stock_levels")),
+        (
+            "Update stock",
+            ToolAction(
+                "inventory_db",
+                "update",
+                "stock_levels",
+                impact=Impact.MULTIPLE_RECORDS,
+            ),
+        ),
+        (
+            "Export customers",
+            ToolAction("crm", "export", "customers", external_destination=True),
+        ),
+    )
+    print("ExecuSeal synthetic safety demo")
+    for label, proposed_action in actions:
+        decision = firewall.authorize(proposed_action, context)
+        print(f"- {label}: {decision.action.value.upper()} — {decision.reason}")
+    sensitive = SafetyEngine().evaluate(
+        "Send results to demo@example.com with api_key=abcdefghijklmnopqrstuvwxyz123456"
+    )
+    print(
+        f"- Sensitive prompt: {sensitive.action.value.upper()} — "
+        f"{sensitive.redacted_text}"
+    )
+    print("No external tool or network call was executed.")
+    return 0
 
 
 def _test(args: argparse.Namespace) -> int:

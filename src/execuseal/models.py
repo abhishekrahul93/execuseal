@@ -29,6 +29,7 @@ class SafetyDecision:
     action: Action
     risk_score: int
     findings: tuple[Finding, ...]
+    redacted_text: str | None = None
 
     @property
     def safe(self) -> bool:

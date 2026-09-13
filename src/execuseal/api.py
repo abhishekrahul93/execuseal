@@ -190,6 +190,7 @@ class ScanResponse(StrictModel):
     action: str
     risk_score: int = Field(ge=0, le=100)
     findings: list[FindingResponse]
+    redacted_text: str | None
 
 
 class ContextRequest(StrictModel):
@@ -534,6 +535,7 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
                 )
                 for finding in decision.findings
             ],
+            redacted_text=decision.redacted_text,
         )
 
     @app.post(

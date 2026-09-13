@@ -47,3 +47,9 @@ restrict it at the network layer to the monitoring system. Metrics intentionally
 exclude prompts, parameters, identity values, and resource names. Treat request
 logs and aggregate safety decisions as security-sensitive operational data;
 apply access controls and a documented retention period.
+
+The scanner can return a redacted copy for selected sensitive-value formats,
+but the original request still existed in the calling process and HTTP path.
+Callers must avoid logging request bodies and must explicitly pass the redacted
+copy downstream. Detection is high-confidence and incomplete; it is not a
+general-purpose data-loss-prevention guarantee.

@@ -1,0 +1,65 @@
+name: Product feedback
+description: Share a safe, synthetic experience or feature request
+title: "[Feedback]: "
+labels: ["feedback"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping improve ExecuSeal. Never submit secrets, personal data, confidential prompts, or vulnerability details here. Use private vulnerability reporting for security issues.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Action policy and enforcement
+        - Prompt, secret, or PII detection
+        - MCP integration
+        - Human approval
+        - Audit and observability
+        - Installation and documentation
+        - Other product feedback
+    validations:
+      required: true
+  - type: textarea
+    id: goal
+    attributes:
+      label: What were you trying to achieve?
+      description: Describe the use case without confidential information.
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: Expected and actual result
+      description: Include only synthetic or fully redacted examples.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: ExecuSeal version or commit
+      placeholder: 0.1.0a0 or commit SHA
+  - type: dropdown
+    id: understandable
+    attributes:
+      label: Was the decision understandable?
+      options:
+        - "Yes"
+        - "Partly"
+        - "No"
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Why would this improvement matter?
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safe submission confirmation
+      options:
+        - label: I removed all secrets, personal data, customer data, private prompts, and internal URLs.
+          required: true
+        - label: This is not a vulnerability report or working bypass.
+          required: true

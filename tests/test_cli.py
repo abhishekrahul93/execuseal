@@ -14,6 +14,18 @@ def test_scan_returns_nonzero_for_threat(capsys: object) -> None:
     assert exit_code == 1
 
 
+def test_demo_shows_allow_review_block_and_redaction(capsys) -> None:
+    assert main(["demo"]) == 0
+
+    output = capsys.readouterr().out
+    assert "Read stock: ALLOW" in output
+    assert "Update stock: REVIEW" in output
+    assert "Export customers: BLOCK" in output
+    assert "[REDACTED_EMAIL]" in output
+    assert "abcdefghijklmnopqrstuvwxyz123456" not in output
+    assert "No external tool" in output
+
+
 def test_policy_validate(tmp_path: Path, capsys: object) -> None:
     path = tmp_path / "policy.json"
     path.write_text(

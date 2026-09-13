@@ -23,6 +23,7 @@ from execuseal.checkpoints import (
     verify_checkpoint,
 )
 from execuseal.config import PolicyConfigError, load_policy, parse_policy
+from execuseal.detectors import SensitiveDataDetector, SensitiveDataResult
 from execuseal.engine import SafetyEngine
 from execuseal.firewall import ActionDecision, ActionFirewall
 from execuseal.identities import IssuedIdentity, ServiceIdentity, SqlIdentityStore
@@ -69,6 +70,8 @@ __all__ = [
     "PolicySet",
     "SafetyDecision",
     "SafetyEngine",
+    "SensitiveDataDetector",
+    "SensitiveDataResult",
     "ServiceIdentity",
     "SqlApprovalStore",
     "SqlIdentityStore",

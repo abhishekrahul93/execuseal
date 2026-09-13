@@ -1,8 +1,9 @@
 # Agent Safety Benchmark
 
-`v0.1.jsonl` is a small, transparent smoke benchmark for the deterministic
-baseline. It contains both adversarial and benign cases. It is not evidence of
-real-world security and must not be described as a comprehensive evaluation.
+`v0.2.jsonl` is the current small, transparent smoke benchmark for the
+deterministic baseline. It extends v0.1 with synthetic secrets, common PII
+formats, and benign lookalikes. It is not evidence of real-world security and
+must not be described as a comprehensive evaluation.
 
 Every line has exactly four fields:
 
@@ -14,7 +15,7 @@ Every line has exactly four fields:
 Run it with:
 
 ```bash
-execuseal test benchmarks/v0.1.jsonl --minimum-score 80
+execuseal test benchmarks/v0.2.jsonl --minimum-score 80
 ```
 
 Results are calculated at runtime. Dataset changes require review because adding

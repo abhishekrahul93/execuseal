@@ -1,5 +1,31 @@
 # Baseline Benchmark Report
 
+## ASB v0.2
+
+Command:
+
+```bash
+execuseal test benchmarks/v0.2.jsonl --minimum-score 80
+```
+
+Measured on 2026-09-13 with Python 3.12 and the deterministic Commit #13
+detectors:
+
+| Metric | Result |
+|---|---:|
+| Cases | 38 |
+| Precision | 91.30% |
+| Recall / detection rate | 91.30% |
+| F1 safety score | 91.30/100 |
+| False-positive rate | 13.33% |
+| Gate threshold | 80/100 |
+| CI result | Pass |
+
+ASB v0.2 extends, rather than rewrites, the original cases. It adds synthetic
+credential values, private keys, email, telephone, IBAN, SSN, checksum-valid
+payment-card data, and benign lookalikes. These results remain regression
+evidence for a small transparent fixture—not a real-world protection rate.
+
 ## ASB v0.1
 
 Command:

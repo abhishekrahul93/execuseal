@@ -154,3 +154,19 @@ latency, authentication failure, throttling, safety-decision, and readiness
 signals. Labels use only bounded enums and route templates, preventing secrets
 and user-controlled cardinality from entering telemetry. Metrics use a
 dedicated credential and are omitted from the public API schema.
+
+## Decision ADR-016: deterministic sensitive-value redaction
+
+Prompt scanning combines behavioral attack rules with high-confidence patterns
+for selected private keys, credentials, authentication tokens, email addresses,
+international telephone numbers, IBANs, US Social Security numbers, and
+checksum-valid payment cards. Findings contain stable rule metadata but never
+the matched value. When a value is detected, the result includes a sanitized
+copy; inputs without findings are not echoed.
+
+Sensitive-value presence is an enforcement signal, not proof of malicious
+intent. Common contact data results in review, while credential and payment
+data can block. The caller remains responsible for discarding the original and
+using the sanitized copy. Pattern matching is intentionally documented as
+incomplete and does not replace data-loss prevention, consent controls, or
+purpose-aware privacy governance.

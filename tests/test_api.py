@@ -102,6 +102,23 @@ def test_scan_returns_explainable_block_and_preserves_request_id(client: TestCli
         "ASL-PI-001",
         "ASL-SE-001",
     }
+    assert body["redacted_text"] is None
+
+
+def test_scan_redacts_sensitive_values_without_storing_them(client: TestClient) -> None:
+    secret = "abcdefghijklmnopqrstuvwxyz123456"
+    response = client.post(
+        "/v1/scan",
+        headers=auth_headers(),
+        json={"text": f"api_key={secret}; contact rahul@example.com"},
+    )
+
+    body = response.json()
+    assert response.status_code == 200
+    assert body["action"] == "block"
+    assert secret not in response.text
+    assert "rahul@example.com" not in response.text
+    assert body["redacted_text"] == "[REDACTED_SECRET]; contact [REDACTED_EMAIL]"
 
 
 def test_invalid_request_id_is_replaced(client: TestClient) -> None:

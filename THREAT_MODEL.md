@@ -26,13 +26,14 @@ detector configuration, approval decisions, and audit storage.
 | ID | Threat | Commit #1 coverage |
 |---|---|---|
 | T1 | Direct instruction override | Baseline pattern detection |
-| T2 | Secret extraction | Baseline pattern detection |
+| T2 | Secret extraction or credential exposure | Request and value detection with redaction |
 | T3 | Data exfiltration | Baseline pattern detection |
 | T4 | Destructive action | Baseline pattern detection |
 | T5 | Indirect prompt injection | Planned |
 | T6 | Tool privilege escalation | Default-deny action policy baseline |
 | T7 | Memory poisoning | Planned |
 | T8 | Cross-agent injection | Planned |
+| T9 | PII exposure in prompt input | High-confidence format detection and redaction |
 
 ## Explicit non-goals for v0.1
 
@@ -46,6 +47,11 @@ detector configuration, approval decisions, and audit storage.
 Pattern rules can be bypassed through paraphrasing, encoding, other languages,
 or multi-step attacks. They can also produce false positives. The baseline is a
 transparent enforcement signal and test harness, not a complete defense.
+
+Sensitive-value rules cover selected credential and PII formats, not every
+secret or personal-data category. Regex detection cannot determine consent,
+purpose, ownership, or full context. Redaction affects the returned sanitized
+copy; the caller must use that copy and must not forward the original value.
 
 Policy enforcement depends on truthful context and action metadata supplied by
 the host application. Hash chaining detects record modification but cannot by

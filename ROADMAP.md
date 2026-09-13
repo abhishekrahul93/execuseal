@@ -25,11 +25,12 @@
 - [x] Signed external audit checkpoints and offline verification
 - [x] Distributed SQL-backed rate limiting across gateway replicas
 - [x] Protected low-cardinality Prometheus metrics and readiness checks
+- [x] Secret and common PII detection with response redaction
+- [x] Synthetic client-value demo and safe feedback workflow
 
 ## v0.2 — agent action security
 
 - resource patterns, principal scopes, quotas, and time constraints
-- secrets and PII detectors with redaction
 - signed audit checkpoints and durable storage adapter
 - indirect prompt-injection benchmark
 

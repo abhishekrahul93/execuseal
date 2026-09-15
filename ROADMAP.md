@@ -46,3 +46,6 @@
 Authentication, rate limiting, PostgreSQL, observability, documented data
 retention, deployment hardening, third-party security review, stable SDK/CLI,
 and measured benchmark results. No version will promise complete safety.
+
+The evidence gates, external review sequence, and organizational certification
+path are defined in [docs/SECURITY_ASSURANCE.md](docs/SECURITY_ASSURANCE.md).

@@ -57,6 +57,45 @@ def test_home_is_public_product_page_with_security_headers(client: TestClient) -
     assert response.headers["x-frame-options"] == "DENY"
 
 
+def test_home_supports_head_probe_without_a_response_body(client: TestClient) -> None:
+    response = client.head("/")
+
+    assert response.status_code == 200
+    assert response.content == b""
+
+
+def test_empty_optional_integer_environment_values_use_defaults(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("EXECUSEAL_API_KEYS", API_KEY)
+    monkeypatch.setenv("EXECUSEAL_RATE_LIMIT_REQUESTS", "")
+    monkeypatch.setenv("EXECUSEAL_RATE_LIMIT_WINDOW_SECONDS", "  ")
+    monkeypatch.setenv("EXECUSEAL_TOKEN_TTL_SECONDS", "")
+    monkeypatch.setenv("EXECUSEAL_APPROVAL_TTL_SECONDS", "")
+    monkeypatch.setenv(
+        "EXECUSEAL_SIGNING_KEYS_JSON",
+        '{"development":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="}',
+    )
+    monkeypatch.setenv("EXECUSEAL_ACTIVE_SIGNING_KEY_ID", "development")
+
+    settings = GatewaySettings.from_environment()
+
+    assert settings.rate_limit_requests == 120
+    assert settings.rate_limit_window_seconds == 60
+    assert settings.token_ttl_seconds == 30
+    assert settings.approval_ttl_seconds == 900
+
+
+def test_invalid_optional_integer_environment_value_has_actionable_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("EXECUSEAL_API_KEYS", API_KEY)
+    monkeypatch.setenv("EXECUSEAL_RATE_LIMIT_REQUESTS", "many")
+
+    with pytest.raises(ValueError, match="EXECUSEAL_RATE_LIMIT_REQUESTS must be an integer"):
+        GatewaySettings.from_environment()
+
+
 def test_public_playground_is_safe_and_requires_no_credentials(client: TestClient) -> None:
     page = client.get("/playground")
     script = client.get("/assets/playground.js")

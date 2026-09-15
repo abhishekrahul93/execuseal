@@ -2,6 +2,15 @@
 
 **Stop unsafe AI agents before they act.**
 
+[![CI](https://github.com/abhishekrahul93/execuseal/actions/workflows/ci.yml/badge.svg)](https://github.com/abhishekrahul93/execuseal/actions/workflows/ci.yml)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB)](https://www.python.org/)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-4c7f22)](LICENSE)
+[![Status: pre-alpha](https://img.shields.io/badge/status-pre--alpha-f0ad4e)](ROADMAP.md)
+
+**[Try the live sandbox](https://execuseal.onrender.com/playground)** ·
+**[View the API](https://execuseal.onrender.com/docs)** ·
+**[Read the five-minute integration guide](docs/QUICKSTART.md)**
+
 ExecuSeal is an open-source action firewall and continuous safety-testing
 platform for AI agents. It evaluates proposed tool actions, enforces explicit
 authorization policy, estimates blast radius, and produces verifiable audit
@@ -34,7 +43,19 @@ execuseal demo
 ```
 
 See [the client value and pilot guide](docs/CLIENT_VALUE.md) and
-[the safe feedback process](FEEDBACK.md).
+[the safe feedback process](FEEDBACK.md). Teams evaluating the project can also
+review the [security assurance and certification roadmap](docs/SECURITY_ASSURANCE.md).
+
+## Understand it in 60 seconds
+
+1. An agent proposes a tool action; it does not execute it yet.
+2. The application sends the action and trusted identity context to ExecuSeal.
+3. ExecuSeal returns `allow`, `review`, or `block`, plus the policy reason and
+   blast-radius assessment.
+4. The host executes only an allowed action with a valid, exact-action token.
+
+The public sandbox demonstrates this flow with fixed fake actions. To integrate
+a real agent safely, follow [the five-minute integration guide](docs/QUICKSTART.md).
 
 ## Why this is different
 

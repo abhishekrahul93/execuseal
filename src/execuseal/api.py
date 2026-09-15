@@ -51,6 +51,18 @@ MAX_INPUT_LENGTH = 100_000
 MAX_METADATA_FIELDS = 32
 
 
+def _environment_int(name: str, default: int) -> int:
+    """Read an integer setting while treating an empty dashboard field as unset."""
+
+    raw_value = os.getenv(name)
+    if raw_value is None or not raw_value.strip():
+        return default
+    try:
+        return int(raw_value)
+    except ValueError as error:
+        raise ValueError(f"{name} must be an integer") from error
+
+
 @dataclass(frozen=True, slots=True)
 class GatewaySettings:
     """Validated runtime configuration. Secrets are never returned by the API."""
@@ -132,18 +144,18 @@ class GatewaySettings:
             policy_path,
             origins,
             os.getenv("EXECUSEAL_DATABASE_URL", "sqlite:///execuseal.db"),
-            int(os.getenv("EXECUSEAL_RATE_LIMIT_REQUESTS", "120")),
-            int(os.getenv("EXECUSEAL_RATE_LIMIT_WINDOW_SECONDS", "60")),
+            _environment_int("EXECUSEAL_RATE_LIMIT_REQUESTS", 120),
+            _environment_int("EXECUSEAL_RATE_LIMIT_WINDOW_SECONDS", 60),
             os.getenv("EXECUSEAL_ENVIRONMENT", "development"),
             os.getenv("EXECUSEAL_SIGNING_KEYS_JSON", "{}"),
             os.getenv("EXECUSEAL_ACTIVE_SIGNING_KEY_ID", ""),
-            int(os.getenv("EXECUSEAL_TOKEN_TTL_SECONDS", "30")),
+            _environment_int("EXECUSEAL_TOKEN_TTL_SECONDS", 30),
             tuple(
                 key.strip()
                 for key in os.getenv("EXECUSEAL_REVIEWER_API_KEYS", "").split(",")
                 if key.strip()
             ),
-            int(os.getenv("EXECUSEAL_APPROVAL_TTL_SECONDS", "900")),
+            _environment_int("EXECUSEAL_APPROVAL_TTL_SECONDS", 900),
             tuple(
                 key.strip()
                 for key in os.getenv("EXECUSEAL_ADMIN_API_KEYS", "").split(",")
@@ -466,6 +478,12 @@ def create_app(settings: GatewaySettings | None = None) -> FastAPI:
     @app.get("/", include_in_schema=False)
     def home() -> Response:
         return landing_page()
+
+    @app.head("/", include_in_schema=False)
+    def home_probe() -> Response:
+        """Support hosting-platform probes without rendering the landing page body."""
+
+        return Response(status_code=status.HTTP_200_OK)
 
     @app.get("/playground", include_in_schema=False)
     def playground() -> Response:
